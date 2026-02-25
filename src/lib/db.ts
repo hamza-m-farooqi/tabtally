@@ -27,7 +27,7 @@ export async function connectToDatabase() {
   if (!globalWithMongoose._mongoose?.promise) {
     globalWithMongoose._mongoose = {
       conn: null,
-      promise: mongoose.connect(MONGODB_URI),
+      promise: mongoose.connect(MONGODB_URI!),
     };
   }
 

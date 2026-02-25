@@ -7,8 +7,9 @@ import { toObjectId } from "@/lib/finance";
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const authUser = await getAuthUserFromRequest(req);
   if (!authUser || authUser.status !== "APPROVED") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -24,7 +25,7 @@ export async function PUT(
   }
 
   await connectToDatabase();
-  const expense = await Expense.findById(params.id);
+  const expense = await Expense.findById(id);
   if (!expense) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -66,15 +67,16 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const authUser = await getAuthUserFromRequest(req);
   if (!authUser || authUser.status !== "APPROVED") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   await connectToDatabase();
-  const expense = await Expense.findById(params.id);
+  const expense = await Expense.findById(id);
   if (!expense) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

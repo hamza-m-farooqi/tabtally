@@ -65,7 +65,9 @@ export async function GET(req: NextRequest) {
     const list = byDate.get(row.date) ?? [];
     const participantSet = new Set<string>();
     for (const e of list) {
-      e.participantUserIds.forEach((id) => participantSet.add(id.toString()));
+      e.participantUserIds.forEach((id: { toString: () => string }) =>
+        participantSet.add(id.toString())
+      );
       participantSet.add(e.paidByUserId.toString());
     }
     participantSet.delete(authUser._id.toString());

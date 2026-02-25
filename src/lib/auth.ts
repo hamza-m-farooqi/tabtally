@@ -20,12 +20,12 @@ export type AuthPayload = {
 };
 
 export function signToken(payload: AuthPayload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign(payload, JWT_SECRET!, { expiresIn: "7d" });
 }
 
 export function verifyToken(token: string): AuthPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as AuthPayload;
+    return jwt.verify(token, JWT_SECRET!) as AuthPayload;
   } catch {
     return null;
   }
@@ -45,8 +45,8 @@ export async function getAuthUserFromRequest(req: NextRequest) {
   return user;
 }
 
-export function clearSessionCookie() {
-  const store = cookies();
+export async function clearSessionCookie() {
+  const store = await cookies();
   store.set(SESSION_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",

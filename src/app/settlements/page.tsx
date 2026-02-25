@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import TopNav from "@/components/TopNav";
 import { CATEGORIES } from "@/lib/categories";
 
@@ -50,18 +50,18 @@ export default function SettlementsPage() {
     return map;
   }, [users]);
 
-  const loadDays = () => {
+  const loadDays = useCallback(() => {
     const params = new URLSearchParams();
     if (month) params.set("month", month);
     if (filterCategory) params.set("category", filterCategory);
     fetch(`/api/settlements/unsettled?${params}`)
       .then((res) => res.json())
       .then((data) => setDays(data.days || []));
-  };
+  }, [month, filterCategory]);
 
   useEffect(() => {
     loadDays();
-  }, [month, filterCategory]);
+  }, [loadDays]);
 
   async function settle(date: string, withUserId: string) {
     await fetch("/api/settlements/settle", {

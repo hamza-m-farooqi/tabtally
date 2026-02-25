@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import TopNav from "@/components/TopNav";
 import { CATEGORIES } from "@/lib/categories";
@@ -60,7 +60,7 @@ export default function DayDetailPage() {
       .then((data) => setUsers(data.users || []));
   }, []);
 
-  const loadDay = () => {
+  const loadDay = useCallback(() => {
     const paramsQuery = new URLSearchParams();
     if (filterCategory) paramsQuery.set("category", filterCategory);
     fetch(`/api/history/${dateParam}?${paramsQuery}`)
@@ -70,11 +70,11 @@ export default function DayDetailPage() {
         setSummary(data.summary || null);
         setPairwise(data.pairwise || {});
       });
-  };
+  }, [dateParam, filterCategory]);
 
   useEffect(() => {
     loadDay();
-  }, [dateParam, filterCategory]);
+  }, [loadDay]);
 
   const userMap = useMemo(() => {
     const map = new Map<string, User>();

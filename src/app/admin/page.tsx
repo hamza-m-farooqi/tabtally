@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
 
 type PendingUser = {
@@ -27,7 +27,7 @@ export default function AdminPage() {
       .then((data) => setCurrentUser(data.user));
   }, []);
 
-  async function loadPending() {
+  const loadPending = useCallback(async () => {
     const res = await fetch("/api/admin/users");
     if (!res.ok) {
       setMessage("Admin access required.");
@@ -35,11 +35,12 @@ export default function AdminPage() {
     }
     const data = await res.json();
     setPending(data.users || []);
-  }
+  }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPending();
-  }, []);
+  }, [loadPending]);
 
   async function act(
     userId: string | undefined,
