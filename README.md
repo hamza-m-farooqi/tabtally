@@ -2,6 +2,8 @@
 
 Shared expense tracker with admin approvals, daily splits, history, and settlements.
 
+![TabTally Screenshot](public/screen.png)
+
 ## Features
 - Auth with admin approvals and optional admin signup secret.
 - Record expenses with participants and equal splits.
