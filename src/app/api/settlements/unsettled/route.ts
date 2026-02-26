@@ -5,6 +5,22 @@ import { Expense } from "@/models/Expense";
 import { Settlement } from "@/models/Settlement";
 import { buildPairwiseNet } from "@/lib/finance";
 
+type PairStatus =
+  | "CAN_REQUEST"
+  | "REQUESTED"
+  | "PENDING_APPROVAL"
+  | "AWAIT_REQUEST"
+  | "SETTLED";
+
+type SettlementPair = {
+  pairId: string;
+  withUserId: string;
+  amount: number;
+  signedNet: number;
+  status: PairStatus;
+  settlementId: string | null;
+};
+
 export async function GET(req: NextRequest) {
   const authUser = await getAuthUserFromRequest(req);
   if (!authUser || authUser.status !== "APPROVED") {
@@ -96,7 +112,8 @@ export async function GET(req: NextRequest) {
     }
     participantSet.delete(authUser._id.toString());
 
-    const pairs = Array.from(participantSet).flatMap((withUserId) => {
+    const pairs = Array.from(participantSet).flatMap<SettlementPair>(
+      (withUserId) => {
       const pendingFromMeKey = `${date}|${authUser._id.toString()}|${withUserId}`;
       const pendingFromOtherKey = `${date}|${withUserId}|${authUser._id.toString()}`;
       const pendingFromMe = settlementMap.get(pendingFromMeKey);
@@ -116,16 +133,11 @@ export async function GET(req: NextRequest) {
           `${date}|${withUserId}|${authUser._id.toString()}`
         ) || 0;
 
-      let remainingNet = Math.round(
+      const remainingNet = Math.round(
         (baseNet + paidByMe - paidByOther) * 100
       ) / 100;
 
-      let status:
-        | "CAN_REQUEST"
-        | "REQUESTED"
-        | "PENDING_APPROVAL"
-        | "AWAIT_REQUEST"
-        | "SETTLED" = "SETTLED";
+      let status: PairStatus = "SETTLED";
       let signedNet = remainingNet;
       let amount = Math.abs(remainingNet);
       let settlementId: string | null = null;
@@ -166,7 +178,7 @@ export async function GET(req: NextRequest) {
         signedNet = settledSigned;
       }
 
-      const result = [];
+      const result: SettlementPair[] = [];
 
       if (status === "SETTLED") {
         result.push({
