@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import TopNav from "@/components/TopNav";
+import SidebarLayout from "@/components/SidebarLayout";
 import { CATEGORIES } from "@/lib/categories";
 import Spinner from "@/components/Spinner";
 
@@ -80,14 +80,13 @@ export default function ExpensesPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-6xl px-6 py-10">
-      <TopNav
-        userName={currentUser?.name}
-        isAdmin={currentUser?.role === "ADMIN"}
-      />
+    <SidebarLayout
+      userName={currentUser?.name}
+      isAdmin={currentUser?.role === "ADMIN"}
+    >
       <div className="grid gap-6">
         <section className="card p-6">
-          <h2 className="text-xl font-semibold">Record Expense</h2>
+          {/* <h2 className="text-xl font-semibold">Record Expense</h2> */}
           <form className="mt-6 space-y-4" onSubmit={onSubmit}>
             <div>
               <label className="text-sm font-medium">Amount</label>
@@ -167,11 +166,10 @@ export default function ExpensesPage() {
             </label>
             {message ? (
               <p
-                className={`rounded-lg px-3 py-2 text-sm ${
-                  messageType === "error"
-                    ? "bg-red-50 text-red-700"
-                    : "bg-emerald-50 text-emerald-700"
-                }`}
+                className={`rounded-lg px-3 py-2 text-sm ${messageType === "error"
+                  ? "bg-red-50 text-red-700"
+                  : "bg-emerald-50 text-emerald-700"
+                  }`}
               >
                 {message}
               </p>
@@ -189,6 +187,6 @@ export default function ExpensesPage() {
           </form>
         </section>
       </div>
-    </main>
+    </SidebarLayout>
   );
 }

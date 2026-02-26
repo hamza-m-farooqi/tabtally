@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import TopNav from "@/components/TopNav";
+import SidebarLayout from "@/components/SidebarLayout";
 import Spinner from "@/components/Spinner";
 
 type MonthSummary = {
@@ -25,11 +25,11 @@ type SettlementPair = {
   amount: number;
   signedNet: number;
   status:
-    | "CAN_REQUEST"
-    | "REQUESTED"
-    | "PENDING_APPROVAL"
-    | "AWAIT_REQUEST"
-    | "SETTLED";
+  | "CAN_REQUEST"
+  | "REQUESTED"
+  | "PENDING_APPROVAL"
+  | "AWAIT_REQUEST"
+  | "SETTLED";
   settlementId?: string | null;
 };
 
@@ -143,11 +143,10 @@ export default function DashboardPage() {
   }, [monthSummary]);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-6xl px-6 py-10">
-      <TopNav
-        userName={currentUser?.name}
-        isAdmin={currentUser?.role === "ADMIN"}
-      />
+    <SidebarLayout
+      userName={currentUser?.name}
+      isAdmin={currentUser?.role === "ADMIN"}
+    >
       <div className="grid gap-6">
         <section className="card p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -254,9 +253,8 @@ export default function DashboardPage() {
               ) : (
                 <>
                   <p
-                    className={`mt-2 text-lg font-semibold ${
-                      netPosition >= 0 ? "text-teal-700" : "text-rose-600"
-                    }`}
+                    className={`mt-2 text-lg font-semibold ${netPosition >= 0 ? "text-teal-700" : "text-rose-600"
+                      }`}
                   >
                     {formatCurrency(Math.abs(netPosition))}
                   </p>
@@ -394,6 +392,6 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
-    </main>
+    </SidebarLayout>
   );
 }

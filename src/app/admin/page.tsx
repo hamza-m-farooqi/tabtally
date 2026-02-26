@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import TopNav from "@/components/TopNav";
+import SidebarLayout from "@/components/SidebarLayout";
 
 type PendingUser = {
   id?: string;
@@ -63,8 +63,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-6xl px-6 py-10">
-      <TopNav userName={currentUser?.name} isAdmin />
+    <SidebarLayout userName={currentUser?.name} isAdmin>
       <section className="card p-6">
         <h2 className="text-xl font-semibold">Approve Users</h2>
         <p className="mt-1 text-sm text-zinc-500">
@@ -97,38 +96,39 @@ export default function AdminPage() {
                   const userId = user.id || user._id;
                   return (
                     <tr key={userId ?? user.email} className="border-t border-zinc-100">
-                    <td className="py-3">{user.name}</td>
-                    <td className="py-3">{user.email}</td>
-                    <td className="py-3">{user.role}</td>
-                    <td className="py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => act(userId, "approve")}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          className="btn btn-ghost"
-                          onClick={() => act(userId, "reject")}
-                        >
-                          Reject
-                        </button>
-                        <button
-                          className="btn btn-ghost"
-                          onClick={() => act(userId, "promote")}
-                        >
-                          Promote to Admin
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )})
+                      <td className="py-3">{user.name}</td>
+                      <td className="py-3">{user.email}</td>
+                      <td className="py-3">{user.role}</td>
+                      <td className="py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            className="btn btn-primary"
+                            onClick={() => act(userId, "approve")}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            className="btn btn-ghost"
+                            onClick={() => act(userId, "reject")}
+                          >
+                            Reject
+                          </button>
+                          <button
+                            className="btn btn-ghost"
+                            onClick={() => act(userId, "promote")}
+                          >
+                            Promote to Admin
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
         </div>
       </section>
-    </main>
+    </SidebarLayout>
   );
 }

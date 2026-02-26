@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import TopNav from "@/components/TopNav";
+import SidebarLayout from "@/components/SidebarLayout";
 import { CATEGORIES } from "@/lib/categories";
 import Spinner from "@/components/Spinner";
 
@@ -12,11 +12,11 @@ type Pair = {
   amount: number;
   signedNet: number;
   status:
-    | "CAN_REQUEST"
-    | "REQUESTED"
-    | "PENDING_APPROVAL"
-    | "AWAIT_REQUEST"
-    | "SETTLED";
+  | "CAN_REQUEST"
+  | "REQUESTED"
+  | "PENDING_APPROVAL"
+  | "AWAIT_REQUEST"
+  | "SETTLED";
   settlementId?: string | null;
 };
 type Day = { date: string; status: "SETTLED" | "UNSETTLED"; pairs: Pair[] };
@@ -25,18 +25,36 @@ function formatCurrency(value: number) {
   return value.toLocaleString(undefined, {
     style: "currency",
     currency: "PKR",
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   });
 }
+
+function formatDateShort(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
+const STATUS_CONFIG: Record<
+  Pair["status"],
+  { label: string; cls: string }
+> = {
+  SETTLED: { label: "Settled", cls: "sett-badge-settled" },
+  REQUESTED: { label: "Requested", cls: "sett-badge-requested" },
+  PENDING_APPROVAL: { label: "Approval needed", cls: "sett-badge-pending" },
+  AWAIT_REQUEST: { label: "Waiting request", cls: "sett-badge-waiting" },
+  CAN_REQUEST: { label: "Action needed", cls: "sett-badge-action" },
+};
 
 export default function SettlementsPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [month, setMonth] = useState(() => {
     const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = `${now.getMonth() + 1}`.padStart(2, "0");
-    return `${yyyy}-${mm}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
   const [filterCategory, setFilterCategory] = useState("");
   const [days, setDays] = useState<Day[]>([]);
@@ -44,21 +62,17 @@ export default function SettlementsPage() {
   const [actionPairId, setActionPairId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => setCurrentUser(data.user));
+    fetch("/api/auth/me").then((r) => r.json()).then((d) => setCurrentUser(d.user));
   }, []);
 
   useEffect(() => {
-    fetch("/api/users")
-      .then((res) => res.json())
-      .then((data) => setUsers(data.users || []));
+    fetch("/api/users").then((r) => r.json()).then((d) => setUsers(d.users || []));
   }, []);
 
   const userMap = useMemo(() => {
-    const map = new Map<string, User>();
-    users.forEach((u) => map.set(u.id, u));
-    return map;
+    const m = new Map<string, User>();
+    users.forEach((u) => m.set(u.id, u));
+    return m;
   }, [users]);
 
   const loadDays = useCallback(() => {
@@ -67,14 +81,12 @@ export default function SettlementsPage() {
     if (filterCategory) params.set("category", filterCategory);
     setLoadingDays(true);
     return fetch(`/api/settlements/unsettled?${params}`)
-      .then((res) => res.json())
-      .then((data) => setDays(data.days || []))
+      .then((r) => r.json())
+      .then((d) => setDays(d.days || []))
       .finally(() => setLoadingDays(false));
   }, [month, filterCategory]);
 
-  useEffect(() => {
-    loadDays();
-  }, [loadDays]);
+  useEffect(() => { loadDays(); }, [loadDays]);
 
   async function requestSettlement(date: string, withUserId: string) {
     setActionPairId(`${date}|${withUserId}|REQUEST`);
@@ -98,172 +110,158 @@ export default function SettlementsPage() {
     setActionPairId(null);
   }
 
+  // Quick summary counts
+  const pendingCount = days.filter((d) => d.status === "UNSETTLED").length;
+  const settledCount = days.filter((d) => d.status === "SETTLED").length;
+
   return (
-    <main className="mx-auto min-h-screen w-full max-w-6xl px-6 py-10">
-      <TopNav
-        userName={currentUser?.name}
-        isAdmin={currentUser?.role === "ADMIN"}
-      />
-      <section className="card p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Settlements</h2>
+    <SidebarLayout
+      userName={currentUser?.name}
+      isAdmin={currentUser?.role === "ADMIN"}
+    >
+      {/* ── Filters ───────────────────────────────────────────── */}
+      <div className="history-filters card" style={{ marginBottom: 20 }}>
+        <div className="history-filter-group">
+          <label className="history-filter-label">Month</label>
+          <input
+            className="input"
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+          />
+        </div>
+        <div className="history-filter-group">
+          <label className="history-filter-label">Category</label>
+          <select
+            className="input"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+          >
+            <option value="">All categories</option>
+            {CATEGORIES.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+        </div>
+        {loadingDays && (
+          <div className="history-filter-loading">
+            <Spinner size="sm" />
+            <span>Refreshing…</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Days list ─────────────────────────────────────────── */}
+      {days.length === 0 ? (
+        <div className="card history-empty">
           {loadingDays ? (
-            <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <Spinner size="sm" />
-              Loading
-            </div>
-          ) : null}
-        </div>
-        <p className="mt-1 text-sm text-zinc-500">
-          Unsettled days where you still need to pay or receive.
-        </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <label className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-              Month
-            </label>
-            <input
-              className="input mt-2"
-              type="month"
-              value={month}
-              onChange={(event) => setMonth(event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-              Category
-            </label>
-            <select
-              className="input mt-2"
-              value={filterCategory}
-              onChange={(event) => setFilterCategory(event.target.value)}
-            >
-              <option value="">All categories</option>
-              {CATEGORIES.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="mt-6 space-y-4">
-          {days.length === 0 ? (
-            <p className="text-sm text-zinc-500">All settled for this month.</p>
+            <><Spinner size="md" /><p>Loading settlements…</p></>
           ) : (
-            days.map((day) => (
-              <div key={day.date} className="rounded-xl border border-zinc-100 bg-white p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">{day.date}</h3>
-                  <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-                    {day.status === "SETTLED" ? "Settled" : "Unsettled"}
-                  </span>
+            <>
+              <span className="history-empty-icon">🎉</span>
+              <p>All settled for this month!</p>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="sett-days">
+          {/* Summary bar */}
+          <div className="sett-summary">
+            <span className="sett-summary-chip sett-summary-pending">
+              {pendingCount} pending
+            </span>
+            <span className="sett-summary-chip sett-summary-settled">
+              {settledCount} settled
+            </span>
+          </div>
+
+          {days.map((day) => (
+            <div
+              key={day.date}
+              className={`card sett-day-card${day.status === "SETTLED" ? " sett-day-settled" : ""}`}
+            >
+              {/* Day header */}
+              <div className="sett-day-header">
+                <div className="sett-day-date-block">
+                  <span className="sett-day-date-formatted">{formatDateShort(day.date)}</span>
+                  <span className="sett-day-date-iso">{day.date}</span>
                 </div>
-                <div className="mt-3 space-y-2 text-sm text-zinc-700">
-                  {day.pairs
-                    .slice()
-                    .sort((a, b) =>
-                      a.status === b.status
-                        ? 0
-                        : a.status === "SETTLED"
-                        ? 1
-                        : -1
-                    )
-                    .map((pair) => {
+                <span className={`history-pill ${day.status === "SETTLED" ? "history-pill-settled" : "history-pill-pending"}`}>
+                  {day.status === "SETTLED" ? "✓ Settled" : "Pending"}
+                </span>
+              </div>
+
+              {/* Pairs */}
+              <div className="sett-pairs">
+                {day.pairs
+                  .slice()
+                  .sort((a, b) =>
+                    a.status === b.status ? 0 : a.status === "SETTLED" ? 1 : -1
+                  )
+                  .map((pair) => {
                     const name = userMap.get(pair.withUserId)?.name || "User";
                     const signed = pair.signedNet;
-                    const badge =
-                      pair.status === "SETTLED"
-                        ? "Settled"
-                        : pair.status === "REQUESTED"
-                        ? "Requested"
-                        : pair.status === "PENDING_APPROVAL"
-                        ? "Approval needed"
-                        : pair.status === "AWAIT_REQUEST"
-                        ? "Waiting request"
-                        : "Action needed";
+                    const isSettled = pair.status === "SETTLED";
+                    const isPos = signed >= 0;
+                    const { label: badgeLabel, cls: badgeCls } = STATUS_CONFIG[pair.status];
+
+                    const description = isSettled
+                      ? isPos ? `You received from ${name}` : `You paid ${name}`
+                      : isPos ? `${name} owes you` : `You owe ${name}`;
+
+                    const reqId = `${day.date}|${pair.withUserId}|REQUEST`;
+                    const isRequesting = actionPairId === reqId;
+                    const isApproving = actionPairId === pair.settlementId;
+
                     return (
-                      <div
-                        key={pair.pairId}
-                        className="flex flex-wrap items-center justify-between gap-2"
-                      >
-                        <span>
-                          {pair.status === "SETTLED"
-                            ? signed >= 0
-                              ? `You received from ${name}`
-                              : `You paid ${name}`
-                            : signed >= 0
-                            ? `${name} owes you`
-                            : `You owe ${name}`}
-                        </span>
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`rounded-full border px-3 py-1 text-xs uppercase tracking-wide ${
-                              pair.status === "SETTLED"
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-600"
-                                : "border-zinc-200 bg-zinc-50 text-zinc-500"
-                            }`}
-                          >
-                            {badge}
+                      <div key={pair.pairId} className={`sett-pair${isSettled ? " sett-pair-settled" : ""}`}>
+                        {/* Left: avatar + description */}
+                        <div className="sett-pair-left">
+                          <div className="sett-pair-avatar">
+                            {name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="sett-pair-desc">
+                            <span className="sett-pair-name">{description}</span>
+                            <span className={`sett-badge ${badgeCls}`}>{badgeLabel}</span>
+                          </div>
+                        </div>
+
+                        {/* Right: amount + action */}
+                        <div className="sett-pair-right">
+                          <span className={`sett-pair-amount ${isSettled ? "sett-amount-settled" : isPos ? "sett-amount-pos" : "sett-amount-neg"}`}>
+                            {formatCurrency(Math.abs(signed))}
                           </span>
-                          <strong
-                            className={
-                              pair.status === "SETTLED"
-                                ? "text-emerald-700"
-                                : signed >= 0
-                                ? "text-teal-700"
-                                : "text-rose-600"
-                            }
-                          >
-                            {pair.status === "SETTLED"
-                              ? formatCurrency(Math.abs(signed))
-                              : formatCurrency(Math.abs(signed))}
-                          </strong>
-                          {pair.status === "CAN_REQUEST" ? (
+                          {pair.status === "CAN_REQUEST" && (
                             <button
-                              className="btn btn-primary"
-                              disabled={actionPairId === `${day.date}|${pair.withUserId}|REQUEST`}
-                              onClick={() =>
-                                requestSettlement(day.date, pair.withUserId)
-                              }
+                              className="btn btn-primary sett-action-btn"
+                              disabled={isRequesting}
+                              onClick={() => requestSettlement(day.date, pair.withUserId)}
                             >
-                              {actionPairId === `${day.date}|${pair.withUserId}|REQUEST` ? (
-                                <span className="flex items-center gap-2">
-                                  <Spinner size="sm" className="spinner-inverse" />
-                                  Requesting...
-                                </span>
-                              ) : (
-                                "Request Approval"
-                              )}
+                              {isRequesting ? (
+                                <><Spinner size="sm" className="spinner-inverse" /> Requesting…</>
+                              ) : "Request Approval"}
                             </button>
-                          ) : null}
-                          {pair.status === "PENDING_APPROVAL" &&
-                          pair.settlementId ? (
+                          )}
+                          {pair.status === "PENDING_APPROVAL" && pair.settlementId && (
                             <button
-                              className="btn btn-primary"
-                              disabled={actionPairId === pair.settlementId}
+                              className="btn btn-primary sett-action-btn"
+                              disabled={isApproving}
                               onClick={() => approveSettlement(pair.settlementId!)}
                             >
-                              {actionPairId === pair.settlementId ? (
-                                <span className="flex items-center gap-2">
-                                  <Spinner size="sm" className="spinner-inverse" />
-                                  Approving...
-                                </span>
-                              ) : (
-                                "Approve"
-                              )}
+                              {isApproving ? (
+                                <><Spinner size="sm" className="spinner-inverse" /> Approving…</>
+                              ) : "Approve"}
                             </button>
-                          ) : null}
+                          )}
                         </div>
                       </div>
                     );
                   })}
-                </div>
               </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
-      </section>
-    </main>
+      )}
+    </SidebarLayout>
   );
 }

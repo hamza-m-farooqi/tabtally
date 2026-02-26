@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import TopNav from "@/components/TopNav";
+import SidebarLayout from "@/components/SidebarLayout";
 import { CATEGORIES } from "@/lib/categories";
 import Spinner from "@/components/Spinner";
 
@@ -30,9 +30,27 @@ function formatCurrency(value: number) {
   return value.toLocaleString(undefined, {
     style: "currency",
     currency: "PKR",
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   });
 }
+
+function formatDateLong(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+const SUMMARY_STATS = [
+  { key: "totalExpense" as const, label: "Total", color: "stat-card-neutral", icon: "💰" },
+  { key: "youPaid" as const, label: "You Paid", color: "stat-card-blue", icon: "📤" },
+  { key: "yourShare" as const, label: "Your Share", color: "stat-card-neutral", icon: "📊" },
+  { key: "youWillPay" as const, label: "Will Pay", color: "stat-card-red", icon: "⏳" },
+  { key: "youWillReceive" as const, label: "Will Receive", color: "stat-card-teal", icon: "✨" },
+];
 
 export default function DayDetailPage() {
   const params = useParams<{ date: string }>();
@@ -42,9 +60,7 @@ export default function DayDetailPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [pairwise, setPairwise] = useState<Record<string, number>>({});
-  const [approvedExpenseIds, setApprovedExpenseIds] = useState<Set<string>>(
-    new Set()
-  );
+  const [approvedExpenseIds, setApprovedExpenseIds] = useState<Set<string>>(new Set());
   const [filterCategory, setFilterCategory] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState("");
@@ -59,40 +75,34 @@ export default function DayDetailPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => setCurrentUser(data.user));
+    fetch("/api/auth/me").then((r) => r.json()).then((d) => setCurrentUser(d.user));
   }, []);
 
   useEffect(() => {
-    fetch("/api/users")
-      .then((res) => res.json())
-      .then((data) => setUsers(data.users || []));
+    fetch("/api/users").then((r) => r.json()).then((d) => setUsers(d.users || []));
   }, []);
 
   const loadDay = useCallback(() => {
-    const paramsQuery = new URLSearchParams();
-    if (filterCategory) paramsQuery.set("category", filterCategory);
+    const q = new URLSearchParams();
+    if (filterCategory) q.set("category", filterCategory);
     setLoadingDay(true);
-    fetch(`/api/history/${dateParam}?${paramsQuery}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setExpenses(data.expenses || []);
-        setSummary(data.summary || null);
-        setPairwise(data.pairwise || {});
-        setApprovedExpenseIds(new Set(data.approvedExpenseIds || []));
+    fetch(`/api/history/${dateParam}?${q}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setExpenses(d.expenses || []);
+        setSummary(d.summary || null);
+        setPairwise(d.pairwise || {});
+        setApprovedExpenseIds(new Set(d.approvedExpenseIds || []));
       })
       .finally(() => setLoadingDay(false));
   }, [dateParam, filterCategory]);
 
-  useEffect(() => {
-    loadDay();
-  }, [loadDay]);
+  useEffect(() => { loadDay(); }, [loadDay]);
 
   const userMap = useMemo(() => {
-    const map = new Map<string, User>();
-    users.forEach((u) => map.set(u.id, u));
-    return map;
+    const m = new Map<string, User>();
+    users.forEach((u) => m.set(u.id, u));
+    return m;
   }, [users]);
 
   function startEdit(expense: Expense) {
@@ -102,49 +112,36 @@ export default function DayDetailPage() {
     setEditNote(expense.note || "");
     setEditCategory(expense.category || "");
     setEditDate(expense.date);
-    const currentId = currentUser?.id;
-    const participants = expense.participantUserIds.filter(
-      (id) => id !== currentId
-    );
-    setEditParticipants(participants);
-    setEditIncludeMe(
-      currentId ? expense.participantUserIds.includes(currentId) : true
-    );
+    const me = currentUser?.id;
+    setEditParticipants(expense.participantUserIds.filter((id) => id !== me));
+    setEditIncludeMe(me ? expense.participantUserIds.includes(me) : true);
   }
 
   async function saveEdit(expenseId: string) {
     setEditMessage(null);
     setSavingId(expenseId);
-    const payload = {
-      amount: Number(editAmount),
-      note: editNote || undefined,
-      category: editCategory || undefined,
-      date: editDate,
-      participantUserIds: editParticipants,
-      includeMe: editIncludeMe,
-    };
     const res = await fetch(`/api/expenses/${expenseId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        amount: Number(editAmount),
+        note: editNote || undefined,
+        category: editCategory || undefined,
+        date: editDate,
+        participantUserIds: editParticipants,
+        includeMe: editIncludeMe,
+      }),
     });
-    if (res.ok) {
-      setEditingId(null);
-      loadDay();
-      setSavingId(null);
-      return;
-    }
-    const data = await res.json().catch(() => ({}));
-    setEditMessage(data.error || "Failed to update expense.");
+    if (res.ok) { setEditingId(null); loadDay(); setSavingId(null); return; }
+    const d = await res.json().catch(() => ({}));
+    setEditMessage(d.error || "Failed to update expense.");
     setSavingId(null);
   }
 
   async function deleteExpense(expenseId: string) {
     setDeletingId(expenseId);
     const res = await fetch(`/api/expenses/${expenseId}`, { method: "DELETE" });
-    if (res.ok) {
-      loadDay();
-    }
+    if (res.ok) loadDay();
     setDeletingId(null);
   }
 
@@ -153,312 +150,252 @@ export default function DayDetailPage() {
     (currentUser?.role === "ADMIN" || expense.paidByUserId === currentUser?.id);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-6xl px-6 py-10">
-      <TopNav
-        userName={currentUser?.name}
-        isAdmin={currentUser?.role === "ADMIN"}
-      />
-      <section className="card p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Day Detail</h2>
-          {loadingDay ? (
-            <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <Spinner size="sm" />
-              Loading
-            </div>
-          ) : null}
+    <SidebarLayout
+      userName={currentUser?.name}
+      isAdmin={currentUser?.role === "ADMIN"}
+    >
+      {/* ── Date heading ───────────────────────────────────── */}
+      <div className="day-date-heading">
+        <div>
+          {/* <p className="day-date-label">Day Detail</p> */}
+          <h2 className="day-date-title">{formatDateLong(dateParam)}</h2>
         </div>
-        <p className="mt-1 text-sm text-zinc-500">{dateParam}</p>
-        <div className="mt-4">
-          <label className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-            Filter category
-          </label>
-          <select
-            className="input mt-2"
-            value={filterCategory}
-            onChange={(event) => setFilterCategory(event.target.value)}
-          >
-            <option value="">All categories</option>
-            {CATEGORIES.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </div>
-        {summary ? (
-          <div className="mt-6 grid gap-3 text-sm text-zinc-700 sm:grid-cols-2">
-            <div className="flex items-center justify-between">
-              <span>Total</span>
-              <strong>{formatCurrency(summary.totalExpense)}</strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Your paid</span>
-              <strong>{formatCurrency(summary.youPaid)}</strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Your share</span>
-              <strong>{formatCurrency(summary.yourShare)}</strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>You received</span>
-              <strong>{formatCurrency(summary.youReceived)}</strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>You will pay</span>
-              <strong className="text-rose-600">
-                {formatCurrency(summary.youWillPay)}
-              </strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>You will receive</span>
-              <strong className="text-teal-700">
-                {formatCurrency(summary.youWillReceive)}
-              </strong>
-            </div>
+        {loadingDay && (
+          <div className="day-loading">
+            <Spinner size="sm" />
+            <span>Loading…</span>
           </div>
-        ) : null}
-        <div className="mt-6 space-y-4">
-          {expenses.length === 0 ? (
-            <p className="text-sm text-zinc-500">
-              {loadingDay ? "Loading expenses..." : "No expenses for this day."}
-            </p>
-          ) : (
-            expenses.map((expense) => {
-              const participants = expense.participantUserIds.map(
-                (id) => userMap.get(id)?.name || "Unknown"
-              );
-              const share =
-                expense.participantUserIds.length > 0
-                  ? expense.amount / expense.participantUserIds.length
-                  : expense.amount;
-              const isSettled = approvedExpenseIds.has(expense._id);
+        )}
+      </div>
 
-              return (
-                <div
-                  key={expense._id}
-                  className="rounded-xl border border-zinc-100 bg-white p-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm text-zinc-500">
-                        {expense.category || "Uncategorized"}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-semibold">
-                          {expense.note || "Expense"}
-                        </p>
-                        {isSettled ? (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                            Settled
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-zinc-500">Amount</p>
-                      <p className="text-lg font-semibold">
-                        {formatCurrency(expense.amount)}
-                      </p>
-                    </div>
-                  </div>
-                  {canEdit(expense) ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        className="btn btn-ghost"
-                        onClick={() => startEdit(expense)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-ghost"
-                        disabled={deletingId === expense._id}
-                        onClick={() => deleteExpense(expense._id)}
-                      >
-                        {deletingId === expense._id ? (
-                          <span className="flex items-center gap-2">
-                            <Spinner size="sm" />
-                            Deleting...
-                          </span>
-                        ) : (
-                          "Delete"
+      {/* ── Summary stats ──────────────────────────────────── */}
+      {summary && (
+        <div className="history-stats" style={{ marginBottom: 20 }}>
+          {SUMMARY_STATS.map(({ key, label, color, icon }) => (
+            <div key={key} className={`history-stat-card ${color}`}>
+              <span className="history-stat-icon">{icon}</span>
+              <p className="history-stat-label">{label}</p>
+              <p className="history-stat-value">{formatCurrency(summary[key])}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="day-grid">
+        {/* ── Expenses list ─────────────────────────────────── */}
+        <div>
+          {/* Filter */}
+          <div className="card day-filter-bar">
+            <label className="day-filter-label">Filter by Category</label>
+            <select
+              className="input"
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+            >
+              <option value="">All categories</option>
+              {CATEGORIES.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Expense cards */}
+          <div className="day-expense-list">
+            {expenses.length === 0 ? (
+              <div className="history-empty card">
+                {loadingDay ? (
+                  <><Spinner size="md" /><p>Loading expenses…</p></>
+                ) : (
+                  <><span className="history-empty-icon">📭</span><p>No expenses for this day.</p></>
+                )}
+              </div>
+            ) : (
+              expenses.map((expense) => {
+                const participants = expense.participantUserIds.map(
+                  (id) => userMap.get(id)?.name || "Unknown"
+                );
+                const share =
+                  expense.participantUserIds.length > 0
+                    ? expense.amount / expense.participantUserIds.length
+                    : expense.amount;
+                const isSettled = approvedExpenseIds.has(expense._id);
+                const paidBy = userMap.get(expense.paidByUserId)?.name || "Unknown";
+                const isEditing = editingId === expense._id;
+
+                return (
+                  <div key={expense._id} className={`day-expense-card card${isSettled ? " day-expense-settled" : ""}`}>
+                    {/* Card header */}
+                    <div className="day-expense-header">
+                      <div className="day-expense-meta">
+                        <span className="day-expense-category">
+                          {expense.category || "Uncategorized"}
+                        </span>
+                        {isSettled && (
+                          <span className="history-pill history-pill-settled">✓ Settled</span>
                         )}
-                      </button>
-                    </div>
-                  ) : null}
-                  <div className="mt-3 grid gap-2 text-sm text-zinc-600 sm:grid-cols-2">
-                    <p>
-                      Paid by:{" "}
-                      <strong>
-                        {userMap.get(expense.paidByUserId)?.name || "Unknown"}
-                      </strong>
-                    </p>
-                    <p>
-                      Split among:{" "}
-                      <strong>{participants.join(", ")}</strong>
-                    </p>
-                    <p>
-                      Per-user share: <strong>{formatCurrency(share)}</strong>
-                    </p>
-                  </div>
-                  {editingId === expense._id ? (
-                    <div className="mt-4 rounded-lg border border-zinc-100 bg-zinc-50 p-4">
-                      <h4 className="text-sm font-semibold">Edit expense</h4>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <label className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-                            Amount
-                          </label>
-                          <input
-                            className="input mt-2"
-                            type="number"
-                            value={editAmount}
-                            onChange={(event) =>
-                              setEditAmount(event.target.value)
-                            }
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-                            Date
-                          </label>
-                          <input
-                            className="input mt-2"
-                            type="date"
-                            value={editDate}
-                            onChange={(event) =>
-                              setEditDate(event.target.value)
-                            }
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-                            Category
-                          </label>
-                          <select
-                            className="input mt-2"
-                            value={editCategory}
-                            onChange={(event) =>
-                              setEditCategory(event.target.value)
-                            }
-                          >
-                            <option value="">Uncategorized</option>
-                            {CATEGORIES.map((item) => (
-                              <option key={item} value={item}>
-                                {item}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-                            Note
-                          </label>
-                          <input
-                            className="input mt-2"
-                            value={editNote}
-                            onChange={(event) =>
-                              setEditNote(event.target.value)
-                            }
-                          />
-                        </div>
                       </div>
-                      <div className="mt-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-                          Participants
-                        </p>
-                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                          {users
-                            .filter((u) => u.id !== currentUser?.id)
-                            .map((user) => (
-                              <label
-                                key={user.id}
-                                className="flex items-center gap-2 text-sm"
-                              >
-                                <input
-                                  type="checkbox"
+                      <div className="day-expense-amount">
+                        {formatCurrency(expense.amount)}
+                      </div>
+                    </div>
+
+                    <p className="day-expense-note">
+                      {expense.note || <span className="day-expense-no-note">No description</span>}
+                    </p>
+
+                    {/* Meta row */}
+                    <div className="day-expense-info">
+                      <span className="day-expense-info-chip">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                        </svg>
+                        Paid by <strong>{paidBy}</strong>
+                      </span>
+                      <span className="day-expense-info-chip">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                        Split: {participants.join(", ")}
+                      </span>
+                      <span className="day-expense-info-chip">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                        </svg>
+                        Per person: <strong>{formatCurrency(share)}</strong>
+                      </span>
+                    </div>
+
+                    {/* Action buttons */}
+                    {canEdit(expense) && !isEditing && (
+                      <div className="day-expense-actions">
+                        <button className="btn btn-ghost" onClick={() => startEdit(expense)}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                          Edit
+                        </button>
+                        <button
+                          className="btn day-btn-delete"
+                          disabled={deletingId === expense._id}
+                          onClick={() => deleteExpense(expense._id)}
+                        >
+                          {deletingId === expense._id ? (
+                            <><Spinner size="sm" /> Deleting…</>
+                          ) : (
+                            <>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                                <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
+                              </svg>
+                              Delete
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Edit form */}
+                    {isEditing && (
+                      <div className="day-edit-form">
+                        <p className="day-edit-title">Edit Expense</p>
+                        <div className="day-edit-grid">
+                          <div>
+                            <label className="day-edit-label">Amount</label>
+                            <input className="input" type="number" value={editAmount}
+                              onChange={(e) => setEditAmount(e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="day-edit-label">Date</label>
+                            <input className="input" type="date" value={editDate}
+                              onChange={(e) => setEditDate(e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="day-edit-label">Category</label>
+                            <select className="input" value={editCategory}
+                              onChange={(e) => setEditCategory(e.target.value)}>
+                              <option value="">Uncategorized</option>
+                              {CATEGORIES.map((item) => (
+                                <option key={item} value={item}>{item}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="day-edit-label">Note</label>
+                            <input className="input" value={editNote}
+                              onChange={(e) => setEditNote(e.target.value)} />
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <p className="day-edit-label">Participants</p>
+                          <div className="day-edit-participants">
+                            {users.filter((u) => u.id !== currentUser?.id).map((user) => (
+                              <label key={user.id} className="day-edit-check-label">
+                                <input type="checkbox"
                                   checked={editParticipants.includes(user.id)}
-                                  onChange={(event) => {
-                                    setEditParticipants((prev) =>
-                                      event.target.checked
-                                        ? [...prev, user.id]
-                                        : prev.filter((id) => id !== user.id)
-                                    );
-                                  }}
+                                  onChange={(e) => setEditParticipants((prev) =>
+                                    e.target.checked ? [...prev, user.id] : prev.filter((id) => id !== user.id)
+                                  )}
                                 />
                                 {user.name}
                               </label>
                             ))}
+                            <label className="day-edit-check-label">
+                              <input type="checkbox" checked={editIncludeMe}
+                                onChange={(e) => setEditIncludeMe(e.target.checked)} />
+                              Include me
+                            </label>
+                          </div>
                         </div>
-                        <label className="mt-3 flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={editIncludeMe}
-                            onChange={(event) =>
-                              setEditIncludeMe(event.target.checked)
-                            }
-                          />
-                          Include me in split
-                        </label>
+                        {editMessage && (
+                          <p className="day-edit-error">{editMessage}</p>
+                        )}
+                        <div className="day-edit-actions">
+                          <button className="btn btn-primary" disabled={savingId === expense._id}
+                            onClick={() => saveEdit(expense._id)}>
+                            {savingId === expense._id ? (
+                              <><Spinner size="sm" className="spinner-inverse" /> Saving…</>
+                            ) : "Save changes"}
+                          </button>
+                          <button className="btn btn-ghost" onClick={() => setEditingId(null)}>
+                            Cancel
+                          </button>
+                        </div>
                       </div>
-                      <div className="mt-4 flex gap-2">
-                        <button
-                          className="btn btn-primary"
-                          disabled={savingId === expense._id}
-                          onClick={() => saveEdit(expense._id)}
-                        >
-                          {savingId === expense._id ? (
-                            <span className="flex items-center gap-2">
-                              <Spinner size="sm" />
-                              Saving...
-                            </span>
-                          ) : (
-                            "Save"
-                          )}
-                        </button>
-                        <button
-                          className="btn btn-ghost"
-                          onClick={() => setEditingId(null)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      {editMessage ? (
-                        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                          {editMessage}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })
-          )}
-        </div>
-        <div className="mt-6 border-t border-zinc-100 pt-4">
-          <h3 className="text-lg font-semibold">Pairwise balances</h3>
-          <div className="mt-3 space-y-2 text-sm text-zinc-700">
-            {Object.keys(pairwise).length === 0 ? (
-              <p className="text-sm text-zinc-500">No pairwise data.</p>
-            ) : (
-              Object.entries(pairwise).map(([userId, value]) => (
-                <div key={userId} className="flex items-center justify-between">
-                  <span>{userMap.get(userId)?.name || "Unknown"}</span>
-                  <strong
-                    className={
-                      value >= 0 ? "text-teal-700" : "text-rose-600"
-                    }
-                  >
-                    {value >= 0
-                      ? `Owes you ${formatCurrency(value)}`
-                      : `You owe ${formatCurrency(Math.abs(value))}`}
-                  </strong>
-                </div>
-              ))
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
-      </section>
-    </main>
+
+        {/* ── Pairwise sidebar ──────────────────────────────── */}
+        {Object.keys(pairwise).length > 0 && (
+          <aside className="card day-pairwise">
+            <h3 className="day-pairwise-title">Balances</h3>
+            <p className="day-pairwise-sub">Net owed between people</p>
+            <div className="day-pairwise-list">
+              {Object.entries(pairwise).map(([userId, value]) => (
+                <div key={userId} className="day-pairwise-row">
+                  <div className="day-pairwise-avatar">
+                    {(userMap.get(userId)?.name || "?").charAt(0).toUpperCase()}
+                  </div>
+                  <div className="day-pairwise-info">
+                    <span className="day-pairwise-name">
+                      {userMap.get(userId)?.name || "Unknown"}
+                    </span>
+                    <span className={`day-pairwise-amount ${value >= 0 ? "day-pairwise-pos" : "day-pairwise-neg"}`}>
+                      {value >= 0
+                        ? `Owes you ${formatCurrency(value)}`
+                        : `You owe ${formatCurrency(Math.abs(value))}`}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
+      </div>
+    </SidebarLayout>
   );
 }

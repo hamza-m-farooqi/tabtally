@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import TopNav from "@/components/TopNav";
+import SidebarLayout from "@/components/SidebarLayout";
 import { CATEGORIES } from "@/lib/categories";
 import Spinner from "@/components/Spinner";
 
@@ -24,9 +24,51 @@ function formatCurrency(value: number) {
   return value.toLocaleString(undefined, {
     style: "currency",
     currency: "PKR",
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   });
 }
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
+const STAT_CONFIG = [
+  {
+    key: "totalExpense" as const,
+    label: "Total Spend",
+    icon: "💰",
+    color: "stat-card-neutral",
+  },
+  {
+    key: "youPaid" as const,
+    label: "You Paid",
+    icon: "📤",
+    color: "stat-card-blue",
+  },
+  {
+    key: "youReceived" as const,
+    label: "You Received",
+    icon: "📥",
+    color: "stat-card-green",
+  },
+  {
+    key: "youWillPay" as const,
+    label: "You Will Pay",
+    icon: "⏳",
+    color: "stat-card-red",
+  },
+  {
+    key: "youWillReceive" as const,
+    label: "You Will Receive",
+    icon: "✨",
+    color: "stat-card-teal",
+  },
+];
 
 export default function HistoryPage() {
   const [currentUser, setCurrentUser] = useState<{
@@ -64,121 +106,144 @@ export default function HistoryPage() {
       .finally(() => setLoading(false));
   }, [month, filterCategory]);
 
+  const settledCount = days.filter((d) => d.settled).length;
+  const unsettledCount = days.length - settledCount;
+
   return (
-    <main className="mx-auto min-h-screen w-full max-w-6xl px-6 py-10">
-      <TopNav
-        userName={currentUser?.name}
-        isAdmin={currentUser?.role === "ADMIN"}
-      />
-      <section className="card p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">History</h2>
-          {loading ? (
-            <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <Spinner size="sm" />
-              Loading
-            </div>
-          ) : null}
+    <SidebarLayout
+      userName={currentUser?.name}
+      isAdmin={currentUser?.role === "ADMIN"}
+    >
+      {/* ── Filters ───────────────────────────────────────────── */}
+      <div className="history-filters card">
+        <div className="history-filter-group">
+          <label className="history-filter-label">Month</label>
+          <input
+            className="input"
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+          />
         </div>
-        <p className="mt-1 text-sm text-zinc-500">
-          Monthly view with daily totals and your net position.
-        </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <label className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-              Month
-            </label>
-            <input
-              className="input mt-2"
-              type="month"
-              value={month}
-              onChange={(event) => setMonth(event.target.value)}
-            />
+        <div className="history-filter-group">
+          <label className="history-filter-label">Category</label>
+          <select
+            className="input"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+          >
+            <option value="">All categories</option>
+            {CATEGORIES.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </div>
+        {loading && (
+          <div className="history-filter-loading">
+            <Spinner size="sm" />
+            <span>Refreshing…</span>
           </div>
-          <div>
-            <label className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-              Category
-            </label>
-            <select
-              className="input mt-2"
-              value={filterCategory}
-              onChange={(event) => setFilterCategory(event.target.value)}
-            >
-              <option value="">All categories</option>
-              {CATEGORIES.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
+        )}
+      </div>
+
+      {/* ── Summary Stat Cards ─────────────────────────────────── */}
+      {monthSummary ? (
+        <div className="history-stats">
+          {STAT_CONFIG.map(({ key, label, icon, color }) => (
+            <div key={key} className={`history-stat-card ${color}`}>
+              <span className="history-stat-icon">{icon}</span>
+              <p className="history-stat-label">{label}</p>
+              <p className="history-stat-value">
+                {formatCurrency(monthSummary[key])}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* ── Day List ──────────────────────────────────────────── */}
+      <div className="card history-table-card">
+        {/* Table header row */}
+        <div className="history-table-header">
+          <h2 className="history-table-title">Daily breakdown</h2>
+          <div className="history-table-badges">
+            <span className="history-badge history-badge-settled">
+              {settledCount} settled
+            </span>
+            <span className="history-badge history-badge-unsettled">
+              {unsettledCount} pending
+            </span>
           </div>
         </div>
-        {monthSummary ? (
-          <div className="mt-6 grid gap-3 text-sm text-zinc-700 sm:grid-cols-3">
-            <div className="flex items-center justify-between">
-              <span>Monthly total</span>
-              <strong>{formatCurrency(monthSummary.totalExpense)}</strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>You paid</span>
-              <strong>{formatCurrency(monthSummary.youPaid)}</strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>You received</span>
-              <strong>{formatCurrency(monthSummary.youReceived)}</strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>You will pay</span>
-              <strong className="text-rose-600">
-                {formatCurrency(monthSummary.youWillPay)}
-              </strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>You will receive</span>
-              <strong className="text-teal-700">
-                {formatCurrency(monthSummary.youWillReceive)}
-              </strong>
-            </div>
-          </div>
-        ) : null}
-        <div className="mt-6 overflow-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="text-xs uppercase tracking-wide text-zinc-500">
-                <th className="pb-2">Date</th>
-                <th className="pb-2">Total Expense</th>
-                <th className="pb-2">Settled</th>
-              </tr>
-            </thead>
-            <tbody>
-              {days.length === 0 ? (
-                <tr>
-                  <td className="py-4 text-zinc-500" colSpan={3}>
-                    {loading ? "Loading history..." : "No history yet."}
-                  </td>
-                </tr>
+
+        {/* Rows */}
+        <div className="history-rows">
+          {days.length === 0 ? (
+            <div className="history-empty">
+              {loading ? (
+                <>
+                  <Spinner size="md" />
+                  <p>Loading history…</p>
+                </>
               ) : (
-                days.map((row) => (
-                  <tr key={row.date} className="border-t border-zinc-100">
-                    <td className="py-3">
-                      <Link
-                        href={`/history/${row.date}`}
-                        className="font-semibold text-teal-700"
-                      >
-                        {row.date}
-                      </Link>
-                    </td>
-                    <td className="py-3">{formatCurrency(row.totalExpense)}</td>
-                    <td className="py-3">
-                      {row.settled ? "Yes" : "No"}
-                    </td>
-                  </tr>
-                ))
+                <>
+                  <span className="history-empty-icon">📭</span>
+                  <p>No history for this period.</p>
+                </>
               )}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            days.map((row) => (
+              <Link
+                key={row.date}
+                href={`/history/${row.date}`}
+                className="history-row"
+              >
+                {/* Date */}
+                <div className="history-row-date">
+                  <span className="history-row-date-formatted">
+                    {formatDate(row.date)}
+                  </span>
+                  <span className="history-row-date-iso">{row.date}</span>
+                </div>
+
+                {/* Amount */}
+                <div className="history-row-amount">
+                  {formatCurrency(row.totalExpense)}
+                </div>
+
+                {/* Status */}
+                <div>
+                  {row.settled ? (
+                    <span className="history-pill history-pill-settled">
+                      ✓ Settled
+                    </span>
+                  ) : (
+                    <span className="history-pill history-pill-pending">
+                      Pending
+                    </span>
+                  )}
+                </div>
+
+                {/* Arrow */}
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="history-row-arrow"
+                >
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </Link>
+            ))
+          )}
         </div>
-      </section>
-    </main>
+      </div>
+    </SidebarLayout>
   );
 }
