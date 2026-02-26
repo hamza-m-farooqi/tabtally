@@ -8,6 +8,8 @@
   --accent: #0f766e;
   --accent-strong: #115e59;
   --stroke: #e2e2e2;
+  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 @theme inline {
@@ -22,7 +24,7 @@ body {
     radial-gradient(1200px 800px at 10% -10%, #ffe7d6 0%, transparent 60%),
     radial-gradient(900px 700px at 110% 10%, #d7f4f1 0%, transparent 55%),
     var(--bg);
-  font-family: var(--font-body), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   min-height: 100vh;
 }
 

@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/lib/db";
 import { Expense } from "@/models/Expense";
 import { expenseSchema } from "@/lib/validators";
 import { toObjectId } from "@/lib/finance";
+import { Settlement } from "@/models/Settlement";
 
 export async function PUT(
   req: NextRequest,
@@ -28,6 +29,17 @@ export async function PUT(
   const expense = await Expense.findById(id);
   if (!expense) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const approvedSettlement = await Settlement.findOne({
+    expenseIds: expense._id,
+    status: "APPROVED",
+  }).lean();
+  if (approvedSettlement) {
+    return NextResponse.json(
+      { error: "Cannot edit expense: it is part of an approved settlement." },
+      { status: 409 }
+    );
   }
 
   if (
@@ -79,6 +91,17 @@ export async function DELETE(
   const expense = await Expense.findById(id);
   if (!expense) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const approvedSettlement = await Settlement.findOne({
+    expenseIds: expense._id,
+    status: "APPROVED",
+  }).lean();
+  if (approvedSettlement) {
+    return NextResponse.json(
+      { error: "Cannot delete expense: it is part of an approved settlement." },
+      { status: 409 }
+    );
   }
 
   if (

@@ -20,7 +20,9 @@ type Summary = {
   totalExpense: number;
   youPaid: number;
   yourShare: number;
-  yourNet: number;
+  youReceived: number;
+  youWillPay: number;
+  youWillReceive: number;
 };
 
 function formatCurrency(value: number) {
@@ -39,6 +41,9 @@ export default function DayDetailPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [pairwise, setPairwise] = useState<Record<string, number>>({});
+  const [approvedExpenseIds, setApprovedExpenseIds] = useState<Set<string>>(
+    new Set()
+  );
   const [filterCategory, setFilterCategory] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState("");
@@ -47,6 +52,7 @@ export default function DayDetailPage() {
   const [editDate, setEditDate] = useState(dateParam);
   const [editParticipants, setEditParticipants] = useState<string[]>([]);
   const [editIncludeMe, setEditIncludeMe] = useState(true);
+  const [editMessage, setEditMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -69,6 +75,7 @@ export default function DayDetailPage() {
         setExpenses(data.expenses || []);
         setSummary(data.summary || null);
         setPairwise(data.pairwise || {});
+        setApprovedExpenseIds(new Set(data.approvedExpenseIds || []));
       });
   }, [dateParam, filterCategory]);
 
@@ -83,6 +90,7 @@ export default function DayDetailPage() {
   }, [users]);
 
   function startEdit(expense: Expense) {
+    setEditMessage(null);
     setEditingId(expense._id);
     setEditAmount(expense.amount.toString());
     setEditNote(expense.note || "");
@@ -99,6 +107,7 @@ export default function DayDetailPage() {
   }
 
   async function saveEdit(expenseId: string) {
+    setEditMessage(null);
     const payload = {
       amount: Number(editAmount),
       note: editNote || undefined,
@@ -115,7 +124,10 @@ export default function DayDetailPage() {
     if (res.ok) {
       setEditingId(null);
       loadDay();
+      return;
     }
+    const data = await res.json().catch(() => ({}));
+    setEditMessage(data.error || "Failed to update expense.");
   }
 
   async function deleteExpense(expenseId: string) {
@@ -126,7 +138,8 @@ export default function DayDetailPage() {
   }
 
   const canEdit = (expense: Expense) =>
-    currentUser?.role === "ADMIN" || expense.paidByUserId === currentUser?.id;
+    !approvedExpenseIds.has(expense._id) &&
+    (currentUser?.role === "ADMIN" || expense.paidByUserId === currentUser?.id);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-6 py-10">
@@ -169,15 +182,19 @@ export default function DayDetailPage() {
               <strong>{formatCurrency(summary.yourShare)}</strong>
             </div>
             <div className="flex items-center justify-between">
-              <span>Your net</span>
-              <strong
-                className={
-                  summary.yourNet >= 0 ? "text-teal-700" : "text-rose-600"
-                }
-              >
-                {summary.yourNet >= 0
-                  ? `Receive ${formatCurrency(summary.yourNet)}`
-                  : `Pay ${formatCurrency(Math.abs(summary.yourNet))}`}
+              <span>You received</span>
+              <strong>{formatCurrency(summary.youReceived)}</strong>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>You will pay</span>
+              <strong className="text-rose-600">
+                {formatCurrency(summary.youWillPay)}
+              </strong>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>You will receive</span>
+              <strong className="text-teal-700">
+                {formatCurrency(summary.youWillReceive)}
               </strong>
             </div>
           </div>
@@ -194,6 +211,7 @@ export default function DayDetailPage() {
                 expense.participantUserIds.length > 0
                   ? expense.amount / expense.participantUserIds.length
                   : expense.amount;
+              const isSettled = approvedExpenseIds.has(expense._id);
 
               return (
                 <div
@@ -205,9 +223,16 @@ export default function DayDetailPage() {
                       <p className="text-sm text-zinc-500">
                         {expense.category || "Uncategorized"}
                       </p>
-                      <p className="text-base font-semibold">
-                        {expense.note || "Expense"}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-base font-semibold">
+                          {expense.note || "Expense"}
+                        </p>
+                        {isSettled ? (
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                            Settled
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-zinc-500">Amount</p>
@@ -361,6 +386,11 @@ export default function DayDetailPage() {
                           Cancel
                         </button>
                       </div>
+                      {editMessage ? (
+                        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                          {editMessage}
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -369,7 +399,7 @@ export default function DayDetailPage() {
           )}
         </div>
         <div className="mt-6 border-t border-zinc-100 pt-4">
-          <h3 className="text-lg font-semibold">Pairwise settlements</h3>
+          <h3 className="text-lg font-semibold">Pairwise balances</h3>
           <div className="mt-3 space-y-2 text-sm text-zinc-700">
             {Object.keys(pairwise).length === 0 ? (
               <p className="text-sm text-zinc-500">No pairwise data.</p>

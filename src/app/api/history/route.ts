@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserFromRequest } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { Expense } from "@/models/Expense";
-import { summarizeDayForUser } from "@/lib/finance";
+import { roundCurrency, summarizeDayForUser } from "@/lib/finance";
 import { Settlement } from "@/models/Settlement";
 import { buildPairwiseNet } from "@/lib/finance";
 
@@ -35,31 +35,83 @@ export async function GET(req: NextRequest) {
     byDate.set(e.date, list);
   }
 
-  const rows = Array.from(byDate.entries()).map(([date, list]) => {
-    const summary = summarizeDayForUser(list, authUser._id.toString());
+  const baseSummaries = new Map<string, ReturnType<typeof summarizeDayForUser>>();
+  for (const [date, list] of byDate.entries()) {
+    baseSummaries.set(
+      date,
+      summarizeDayForUser(list, authUser._id.toString())
+    );
+  }
+
+  const dates = Array.from(byDate.keys());
+  const settlements = await Settlement.find({
+    ...(dates.length ? { date: { $in: dates } } : {}),
+    $or: [
+      { paidByUserId: authUser._id },
+      { paidToUserId: authUser._id },
+    ],
+  }).lean();
+
+  const settlementMap = new Map<
+    string,
+    { status: string; expenseIds: string[] }
+  >();
+  const settlementPaidByDate = new Map<string, number>();
+  const settlementPaidToDate = new Map<string, number>();
+  let settlementPaidByTotal = 0;
+  let settlementPaidToTotal = 0;
+  for (const s of settlements) {
+    const key = `${s.date}|${s.paidByUserId.toString()}|${s.paidToUserId.toString()}`;
+    settlementMap.set(key, {
+      status: s.status,
+      expenseIds: s.expenseIds.map((id) => id.toString()),
+    });
+    if (s.status === "APPROVED") {
+      if (s.paidByUserId.toString() === authUser._id.toString()) {
+        settlementPaidByDate.set(
+          s.date,
+          (settlementPaidByDate.get(s.date) || 0) + s.amount
+        );
+        settlementPaidByTotal += s.amount;
+      } else if (s.paidToUserId.toString() === authUser._id.toString()) {
+        settlementPaidToDate.set(
+          s.date,
+          (settlementPaidToDate.get(s.date) || 0) + s.amount
+        );
+        settlementPaidToTotal += s.amount;
+      }
+    }
+  }
+
+  const rows = Array.from(byDate.entries()).map(([date]) => {
+    const base = baseSummaries.get(date);
+    if (!base) {
+      return { date, totalExpense: 0 };
+    }
     return {
       date,
-      totalExpense: summary.totalExpense,
-      youPaid: summary.youPaid,
-      yourNet: summary.yourNet,
+      totalExpense: base.totalExpense,
     };
   });
 
   rows.sort((a, b) => (a.date < b.date ? 1 : -1));
 
-  const monthSummary = summarizeDayForUser(expenses, authUser._id.toString());
-
-  const dates = rows.map((row) => row.date);
-  const settlements = await Settlement.find({
-    ...(dates.length ? { date: { $in: dates } } : {}),
-    $or: [{ userId: authUser._id }, { withUserId: authUser._id }],
-  }).lean();
-
-  const settlementMap = new Map<string, string>();
-  for (const s of settlements) {
-    const key = `${s.date}|${s.userId.toString()}|${s.withUserId.toString()}`;
-    settlementMap.set(key, s.status);
-  }
+  const baseMonthSummary = summarizeDayForUser(
+    expenses,
+    authUser._id.toString()
+  );
+  const monthNet = roundCurrency(
+    baseMonthSummary.youPaid -
+      baseMonthSummary.yourShare +
+      (settlementPaidByTotal - settlementPaidToTotal)
+  );
+  const monthSummary = {
+    totalExpense: baseMonthSummary.totalExpense,
+    youPaid: roundCurrency(baseMonthSummary.youPaid + settlementPaidByTotal),
+    youReceived: roundCurrency(settlementPaidToTotal),
+    youWillPay: monthNet < 0 ? roundCurrency(Math.abs(monthNet)) : 0,
+    youWillReceive: monthNet > 0 ? roundCurrency(monthNet) : 0,
+  };
 
   const days = rows.map((row) => {
     const list = byDate.get(row.date) ?? [];
@@ -72,26 +124,38 @@ export async function GET(req: NextRequest) {
     }
     participantSet.delete(authUser._id.toString());
 
-    const pairwise = buildPairwiseNet(
-      list,
-      authUser._id.toString(),
-      Array.from(participantSet)
-    );
+    const settledExpenseIds = new Set<string>();
+    const pendingPairs = new Set<string>();
+    for (const s of settlements) {
+      if (s.date !== row.date) continue;
+      if (s.status === "APPROVED") {
+        s.expenseIds.forEach((id) => settledExpenseIds.add(id.toString()));
+      } else if (s.status === "REQUESTED") {
+        const a = s.paidByUserId.toString();
+        const b = s.paidToUserId.toString();
+        pendingPairs.add([a, b].sort().join("|"));
+      }
+    }
 
-    const required = Object.entries(pairwise)
-      .filter(([, value]) => Math.abs(value) > 0.01)
-      .map(([withUserId]) => withUserId);
+    const allApproved =
+      list.length === 0 ||
+      list.every((e) => settledExpenseIds.has(e._id.toString()));
 
-    const settled =
-      required.length === 0 ||
-      required.every((withId) => {
-        const meKey = `${row.date}|${authUser._id.toString()}|${withId}`;
-        const otherKey = `${row.date}|${withId}|${authUser._id.toString()}`;
-        return (
-          settlementMap.get(meKey) === "SETTLED" &&
-          settlementMap.get(otherKey) === "SETTLED"
-        );
+    let netZero = false;
+    if (list.length > 0) {
+      const pairwise = buildPairwiseNet(
+        list,
+        authUser._id.toString(),
+        Array.from(participantSet)
+      );
+      netZero = Object.entries(pairwise).every(([withId, value]) => {
+        if (Math.abs(value) > 0.01) return false;
+        const pairKey = [authUser._id.toString(), withId].sort().join("|");
+        return !pendingPairs.has(pairKey);
       });
+    }
+
+    const settled = allApproved || netZero;
 
     return { ...row, settled };
   });

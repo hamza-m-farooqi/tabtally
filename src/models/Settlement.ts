@@ -2,10 +2,12 @@ import { Schema, model, models, Types } from "mongoose";
 
 export interface SettlementDocument {
   date: string;
-  userId: Types.ObjectId;
-  withUserId: Types.ObjectId;
-  status: "PENDING" | "SETTLED";
-  settledAt?: Date;
+  expenseIds: Types.ObjectId[];
+  paidByUserId: Types.ObjectId;
+  paidToUserId: Types.ObjectId;
+  amount: number;
+  status: "REQUESTED" | "APPROVED" | "REJECTED";
+  approvedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -13,19 +15,27 @@ export interface SettlementDocument {
 const SettlementSchema = new Schema<SettlementDocument>(
   {
     date: { type: String, required: true, index: true },
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    withUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    expenseIds: [{ type: Schema.Types.ObjectId, ref: "Expense", required: true }],
+    paidByUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    paidToUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    amount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ["PENDING", "SETTLED"],
-      default: "PENDING",
+      enum: ["REQUESTED", "APPROVED", "REJECTED"],
+      default: "REQUESTED",
     },
-    settledAt: { type: Date },
+    approvedAt: { type: Date },
   },
   { timestamps: true }
 );
 
-SettlementSchema.index({ date: 1, userId: 1, withUserId: 1 }, { unique: true });
+SettlementSchema.index({ date: 1, paidByUserId: 1, paidToUserId: 1 });
 
-export const Settlement =
-  models.Settlement || model<SettlementDocument>("Settlement", SettlementSchema);
+if (models.Settlement) {
+  delete models.Settlement;
+}
+
+export const Settlement = model<SettlementDocument>(
+  "Settlement",
+  SettlementSchema
+);

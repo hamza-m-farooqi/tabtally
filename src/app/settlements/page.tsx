@@ -6,11 +6,19 @@ import { CATEGORIES } from "@/lib/categories";
 
 type User = { id: string; name: string; email: string; role: string };
 type Pair = {
+  pairId: string;
   withUserId: string;
   amount: number;
-  status: "PENDING_ME" | "PENDING_OTHER" | "SETTLED";
+  signedNet: number;
+  status:
+    | "CAN_REQUEST"
+    | "REQUESTED"
+    | "PENDING_APPROVAL"
+    | "AWAIT_REQUEST"
+    | "SETTLED";
+  settlementId?: string | null;
 };
-type Day = { date: string; pairs: Pair[] };
+type Day = { date: string; status: "SETTLED" | "UNSETTLED"; pairs: Pair[] };
 
 function formatCurrency(value: number) {
   return value.toLocaleString(undefined, {
@@ -63,11 +71,20 @@ export default function SettlementsPage() {
     loadDays();
   }, [loadDays]);
 
-  async function settle(date: string, withUserId: string) {
-    await fetch("/api/settlements/settle", {
+  async function requestSettlement(date: string, withUserId: string) {
+    await fetch("/api/settlements/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ date, withUserId }),
+    });
+    loadDays();
+  }
+
+  async function approveSettlement(settlementId: string) {
+    await fetch("/api/settlements/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settlementId }),
     });
     loadDays();
   }
@@ -122,46 +139,86 @@ export default function SettlementsPage() {
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">{day.date}</h3>
                   <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-                    Unsettled
+                    {day.status === "SETTLED" ? "Settled" : "Unsettled"}
                   </span>
                 </div>
                 <div className="mt-3 space-y-2 text-sm text-zinc-700">
-                  {day.pairs.map((pair) => {
+                  {day.pairs
+                    .slice()
+                    .sort((a, b) =>
+                      a.status === b.status
+                        ? 0
+                        : a.status === "SETTLED"
+                        ? 1
+                        : -1
+                    )
+                    .map((pair) => {
                     const name = userMap.get(pair.withUserId)?.name || "User";
-                    const value = pair.amount;
+                    const signed = pair.signedNet;
                     const badge =
                       pair.status === "SETTLED"
                         ? "Settled"
-                        : pair.status === "PENDING_OTHER"
-                        ? "Waiting on other"
+                        : pair.status === "REQUESTED"
+                        ? "Requested"
+                        : pair.status === "PENDING_APPROVAL"
+                        ? "Approval needed"
+                        : pair.status === "AWAIT_REQUEST"
+                        ? "Waiting request"
                         : "Action needed";
                     return (
                       <div
-                        key={pair.withUserId}
+                        key={pair.pairId}
                         className="flex flex-wrap items-center justify-between gap-2"
                       >
                         <span>
-                          {value >= 0
+                          {pair.status === "SETTLED"
+                            ? signed >= 0
+                              ? `You received from ${name}`
+                              : `You paid ${name}`
+                            : signed >= 0
                             ? `${name} owes you`
                             : `You owe ${name}`}
                         </span>
                         <div className="flex items-center gap-3">
-                          <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs uppercase tracking-wide text-zinc-500">
+                          <span
+                            className={`rounded-full border px-3 py-1 text-xs uppercase tracking-wide ${
+                              pair.status === "SETTLED"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-600"
+                                : "border-zinc-200 bg-zinc-50 text-zinc-500"
+                            }`}
+                          >
                             {badge}
                           </span>
                           <strong
                             className={
-                              value >= 0 ? "text-teal-700" : "text-rose-600"
+                              pair.status === "SETTLED"
+                                ? "text-emerald-700"
+                                : signed >= 0
+                                ? "text-teal-700"
+                                : "text-rose-600"
                             }
                           >
-                            {formatCurrency(Math.abs(value))}
+                            {pair.status === "SETTLED"
+                              ? formatCurrency(Math.abs(signed))
+                              : formatCurrency(Math.abs(signed))}
                           </strong>
-                          {pair.status === "PENDING_ME" ? (
+                          {pair.status === "CAN_REQUEST" ? (
                             <button
                               className="btn btn-primary"
-                              onClick={() => settle(day.date, pair.withUserId)}
+                              onClick={() =>
+                                requestSettlement(day.date, pair.withUserId)
+                              }
                             >
-                              Settle
+                              Request Approval
+                            </button>
+                          ) : null}
+                          {pair.status === "PENDING_APPROVAL" &&
+                          pair.settlementId ? (
+                            <button
+                              className="btn btn-primary"
+                              onClick={() => approveSettlement(pair.settlementId!)}
+                            >
+                              Approve
                             </button>
                           ) : null}
                         </div>

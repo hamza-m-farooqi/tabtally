@@ -8,15 +8,15 @@ import { CATEGORIES } from "@/lib/categories";
 type DayRow = {
   date: string;
   totalExpense: number;
-  youPaid: number;
-  yourNet: number;
   settled?: boolean;
 };
 
 type MonthSummary = {
   totalExpense: number;
   youPaid: number;
-  yourNet: number;
+  youReceived: number;
+  youWillPay: number;
+  youWillReceive: number;
 };
 
 function formatCurrency(value: number) {
@@ -104,7 +104,7 @@ export default function HistoryPage() {
         {monthSummary ? (
           <div className="mt-6 grid gap-3 text-sm text-zinc-700 sm:grid-cols-3">
             <div className="flex items-center justify-between">
-              <span>Month total</span>
+              <span>Monthly total</span>
               <strong>{formatCurrency(monthSummary.totalExpense)}</strong>
             </div>
             <div className="flex items-center justify-between">
@@ -112,15 +112,19 @@ export default function HistoryPage() {
               <strong>{formatCurrency(monthSummary.youPaid)}</strong>
             </div>
             <div className="flex items-center justify-between">
-              <span>Your net</span>
-              <strong
-                className={
-                  monthSummary.yourNet >= 0 ? "text-teal-700" : "text-rose-600"
-                }
-              >
-                {monthSummary.yourNet >= 0
-                  ? `+${formatCurrency(monthSummary.yourNet)}`
-                  : `-${formatCurrency(Math.abs(monthSummary.yourNet))}`}
+              <span>You received</span>
+              <strong>{formatCurrency(monthSummary.youReceived)}</strong>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>You will pay</span>
+              <strong className="text-rose-600">
+                {formatCurrency(monthSummary.youWillPay)}
+              </strong>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>You will receive</span>
+              <strong className="text-teal-700">
+                {formatCurrency(monthSummary.youWillReceive)}
               </strong>
             </div>
           </div>
@@ -131,15 +135,13 @@ export default function HistoryPage() {
               <tr className="text-xs uppercase tracking-wide text-zinc-500">
                 <th className="pb-2">Date</th>
                 <th className="pb-2">Total Expense</th>
-                <th className="pb-2">You Paid</th>
-                <th className="pb-2">Your Net</th>
                 <th className="pb-2">Settled</th>
               </tr>
             </thead>
             <tbody>
               {days.length === 0 ? (
                 <tr>
-                  <td className="py-4 text-zinc-500" colSpan={5}>
+                  <td className="py-4 text-zinc-500" colSpan={3}>
                     No history yet.
                   </td>
                 </tr>
@@ -155,16 +157,6 @@ export default function HistoryPage() {
                       </Link>
                     </td>
                     <td className="py-3">{formatCurrency(row.totalExpense)}</td>
-                    <td className="py-3">{formatCurrency(row.youPaid)}</td>
-                    <td
-                      className={`py-3 ${
-                        row.yourNet >= 0 ? "text-teal-700" : "text-rose-600"
-                      }`}
-                    >
-                      {row.yourNet >= 0
-                        ? `+${formatCurrency(row.yourNet)}`
-                        : `-${formatCurrency(Math.abs(row.yourNet))}`}
-                    </td>
                     <td className="py-3">
                       {row.settled ? "Yes" : "No"}
                     </td>
