@@ -26,6 +26,9 @@ export default function TopNav({
         <h1 className="text-2xl font-semibold">Shared expense workspace</h1>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <Link className="btn btn-ghost" href="/dashboard">
+          Dashboard
+        </Link>
         <Link className="btn btn-ghost" href="/expenses">
           Record
         </Link>

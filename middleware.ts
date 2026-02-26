@@ -35,9 +35,12 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (token && (pathname === "/" || pathname === "/signin" || pathname === "/signup")) {
+  if (
+    token &&
+    (pathname === "/" || pathname === "/signin" || pathname === "/signup")
+  ) {
     const url = req.nextUrl.clone();
-    url.pathname = "/expenses";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 

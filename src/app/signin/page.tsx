@@ -27,7 +27,7 @@ export default function SignInPage() {
     });
 
     if (res.ok) {
-      router.push("/expenses");
+      router.push("/dashboard");
       return;
     }
 

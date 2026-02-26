@@ -36,7 +36,7 @@ export default function SignUpPage() {
         router.push("/signin?pending=1");
         return;
       }
-      router.push("/expenses");
+      router.push("/dashboard");
       return;
     }
 
