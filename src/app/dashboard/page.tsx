@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
+import Spinner from "@/components/Spinner";
 
 type MonthSummary = {
   totalExpense: number;
@@ -61,6 +62,8 @@ export default function DashboardPage() {
   const [days, setDays] = useState<DayRow[]>([]);
   const [unsettledDays, setUnsettledDays] = useState<SettlementDay[]>([]);
   const [month] = useState(currentMonthISO());
+  const [loadingSummary, setLoadingSummary] = useState(true);
+  const [loadingUnsettled, setLoadingUnsettled] = useState(true);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -71,20 +74,24 @@ export default function DashboardPage() {
   useEffect(() => {
     const params = new URLSearchParams();
     params.set("month", month);
+    setLoadingSummary(true);
     fetch(`/api/history?${params}`)
       .then((res) => res.json())
       .then((data) => {
         setDays(data.days || []);
         setMonthSummary(data.monthSummary || null);
-      });
+      })
+      .finally(() => setLoadingSummary(false));
   }, [month]);
 
   useEffect(() => {
     const params = new URLSearchParams();
     params.set("month", month);
+    setLoadingUnsettled(true);
     fetch(`/api/settlements/unsettled?${params}`)
       .then((res) => res.json())
-      .then((data) => setUnsettledDays(data.days || []));
+      .then((data) => setUnsettledDays(data.days || []))
+      .finally(() => setLoadingUnsettled(false));
   }, [month]);
 
   const unsettledStats = useMemo(() => {
@@ -129,6 +136,12 @@ export default function DashboardPage() {
 
   const recentDays = useMemo(() => days.slice(0, 5), [days]);
 
+  const netPosition = useMemo(() => {
+    const receive = monthSummary?.youWillReceive || 0;
+    const pay = monthSummary?.youWillPay || 0;
+    return receive - pay;
+  }, [monthSummary]);
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-6 py-10">
       <TopNav
@@ -153,53 +166,120 @@ export default function DashboardPage() {
               </Link>
             </div>
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-5">
-            <div className="rounded-xl border border-zinc-100 bg-white p-4">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="rounded-xl border border-zinc-100 bg-white p-3">
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
                 Total spend
               </p>
-              <p className="mt-2 text-lg font-semibold text-zinc-900">
-                {formatCurrency(monthSummary?.totalExpense || 0)}
-              </p>
+              {loadingSummary ? (
+                <div className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
+                  <Spinner size="sm" />
+                  Loading
+                </div>
+              ) : (
+                <p className="mt-2 text-base font-semibold text-zinc-900">
+                  {formatCurrency(monthSummary?.totalExpense || 0)}
+                </p>
+              )}
             </div>
-            <div className="rounded-xl border border-zinc-100 bg-white p-4">
+            <div className="rounded-xl border border-zinc-100 bg-white p-3">
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
                 You paid
               </p>
-              <p className="mt-2 text-lg font-semibold text-zinc-900">
-                {formatCurrency(monthSummary?.youPaid || 0)}
-              </p>
+              {loadingSummary ? (
+                <div className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
+                  <Spinner size="sm" />
+                  Loading
+                </div>
+              ) : (
+                <p className="mt-2 text-base font-semibold text-zinc-900">
+                  {formatCurrency(monthSummary?.youPaid || 0)}
+                </p>
+              )}
             </div>
-            <div className="rounded-xl border border-zinc-100 bg-white p-4">
+            <div className="rounded-xl border border-zinc-100 bg-white p-3">
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
                 You received
               </p>
-              <p className="mt-2 text-lg font-semibold text-zinc-900">
-                {formatCurrency(monthSummary?.youReceived || 0)}
-              </p>
+              {loadingSummary ? (
+                <div className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
+                  <Spinner size="sm" />
+                  Loading
+                </div>
+              ) : (
+                <p className="mt-2 text-base font-semibold text-zinc-900">
+                  {formatCurrency(monthSummary?.youReceived || 0)}
+                </p>
+              )}
             </div>
-            <div className="rounded-xl border border-zinc-100 bg-white p-4">
+            <div className="rounded-xl border border-zinc-100 bg-white p-3">
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
                 You will receive
               </p>
-              <p className="mt-2 text-lg font-semibold text-teal-700">
-                {formatCurrency(monthSummary?.youWillReceive || 0)}
-              </p>
+              {loadingSummary ? (
+                <div className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
+                  <Spinner size="sm" />
+                  Loading
+                </div>
+              ) : (
+                <p className="mt-2 text-base font-semibold text-teal-700">
+                  {formatCurrency(monthSummary?.youWillReceive || 0)}
+                </p>
+              )}
             </div>
-            <div className="rounded-xl border border-zinc-100 bg-white p-4">
+            <div className="rounded-xl border border-zinc-100 bg-white p-3">
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
                 You will pay
               </p>
-              <p className="mt-2 text-lg font-semibold text-rose-600">
-                {formatCurrency(monthSummary?.youWillPay || 0)}
+              {loadingSummary ? (
+                <div className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
+                  <Spinner size="sm" />
+                  Loading
+                </div>
+              ) : (
+                <p className="mt-2 text-base font-semibold text-rose-600">
+                  {formatCurrency(monthSummary?.youWillPay || 0)}
+                </p>
+              )}
+            </div>
+            <div className="rounded-xl border border-zinc-200 bg-gradient-to-br from-emerald-50 via-white to-rose-50 p-4 sm:col-span-2 lg:col-span-1">
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-600">
+                Net position
               </p>
+              {loadingSummary ? (
+                <div className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
+                  <Spinner size="sm" />
+                  Loading
+                </div>
+              ) : (
+                <>
+                  <p
+                    className={`mt-2 text-lg font-semibold ${
+                      netPosition >= 0 ? "text-teal-700" : "text-rose-600"
+                    }`}
+                  >
+                    {formatCurrency(Math.abs(netPosition))}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {netPosition >= 0 ? "You are owed" : "You owe"}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[2fr,1fr]">
           <div className="card p-6">
-            <h3 className="text-lg font-semibold">Recent activity</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Recent activity</h3>
+              {loadingSummary ? (
+                <div className="flex items-center gap-2 text-xs text-zinc-500">
+                  <Spinner size="sm" />
+                  Loading
+                </div>
+              ) : null}
+            </div>
             <p className="mt-1 text-sm text-zinc-500">
               Latest days with totals and settlement status.
             </p>
@@ -216,7 +296,7 @@ export default function DashboardPage() {
                   {recentDays.length === 0 ? (
                     <tr>
                       <td className="py-4 text-zinc-500" colSpan={3}>
-                        No activity yet.
+                        {loadingSummary ? "Loading activity..." : "No activity yet."}
                       </td>
                     </tr>
                   ) : (
@@ -245,29 +325,41 @@ export default function DashboardPage() {
           </div>
 
           <div className="card p-6">
-            <h3 className="text-lg font-semibold">Settlement snapshot</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Settlement snapshot</h3>
+              {loadingUnsettled ? (
+                <div className="flex items-center gap-2 text-xs text-zinc-500">
+                  <Spinner size="sm" />
+                  Loading
+                </div>
+              ) : null}
+            </div>
             <p className="mt-1 text-sm text-zinc-500">
               Open balances for this month.
             </p>
             <div className="mt-4 grid gap-3 text-sm text-zinc-700">
               <div className="flex items-center justify-between">
                 <span>Unsettled days</span>
-                <strong>{unsettledDays.length}</strong>
+                <strong>{loadingUnsettled ? "..." : unsettledDays.length}</strong>
               </div>
               <div className="flex items-center justify-between">
                 <span>Pending approvals</span>
-                <strong>{unsettledStats.pendingApprovals}</strong>
+                <strong>{loadingUnsettled ? "..." : unsettledStats.pendingApprovals}</strong>
               </div>
               <div className="flex items-center justify-between">
                 <span>You owe</span>
                 <strong className="text-rose-600">
-                  {formatCurrency(unsettledStats.youOwe)}
+                  {loadingUnsettled
+                    ? "..."
+                    : formatCurrency(unsettledStats.youOwe)}
                 </strong>
               </div>
               <div className="flex items-center justify-between">
                 <span>Owed to you</span>
                 <strong className="text-teal-700">
-                  {formatCurrency(unsettledStats.owedToYou)}
+                  {loadingUnsettled
+                    ? "..."
+                    : formatCurrency(unsettledStats.owedToYou)}
                 </strong>
               </div>
             </div>

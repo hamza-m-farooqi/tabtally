@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Spinner from "@/components/Spinner";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -97,7 +98,14 @@ export default function SignUpPage() {
             </p>
           ) : null}
           <button className="btn btn-primary w-full" disabled={loading}>
-            {loading ? "Creating..." : "Create account"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <Spinner size="sm" className="spinner-inverse" />
+                Creating...
+              </span>
+            ) : (
+              "Create account"
+            )}
           </button>
         </form>
         <p className="mt-4 text-sm text-zinc-500">

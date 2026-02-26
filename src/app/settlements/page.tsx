@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import TopNav from "@/components/TopNav";
 import { CATEGORIES } from "@/lib/categories";
+import Spinner from "@/components/Spinner";
 
 type User = { id: string; name: string; email: string; role: string };
 type Pair = {
@@ -39,6 +40,8 @@ export default function SettlementsPage() {
   });
   const [filterCategory, setFilterCategory] = useState("");
   const [days, setDays] = useState<Day[]>([]);
+  const [loadingDays, setLoadingDays] = useState(true);
+  const [actionPairId, setActionPairId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -62,9 +65,11 @@ export default function SettlementsPage() {
     const params = new URLSearchParams();
     if (month) params.set("month", month);
     if (filterCategory) params.set("category", filterCategory);
-    fetch(`/api/settlements/unsettled?${params}`)
+    setLoadingDays(true);
+    return fetch(`/api/settlements/unsettled?${params}`)
       .then((res) => res.json())
-      .then((data) => setDays(data.days || []));
+      .then((data) => setDays(data.days || []))
+      .finally(() => setLoadingDays(false));
   }, [month, filterCategory]);
 
   useEffect(() => {
@@ -72,21 +77,25 @@ export default function SettlementsPage() {
   }, [loadDays]);
 
   async function requestSettlement(date: string, withUserId: string) {
+    setActionPairId(`${date}|${withUserId}|REQUEST`);
     await fetch("/api/settlements/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ date, withUserId }),
     });
-    loadDays();
+    await loadDays();
+    setActionPairId(null);
   }
 
   async function approveSettlement(settlementId: string) {
+    setActionPairId(settlementId);
     await fetch("/api/settlements/approve", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settlementId }),
     });
-    loadDays();
+    await loadDays();
+    setActionPairId(null);
   }
 
   return (
@@ -96,7 +105,15 @@ export default function SettlementsPage() {
         isAdmin={currentUser?.role === "ADMIN"}
       />
       <section className="card p-6">
-        <h2 className="text-xl font-semibold">Settlements</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Settlements</h2>
+          {loadingDays ? (
+            <div className="flex items-center gap-2 text-xs text-zinc-500">
+              <Spinner size="sm" />
+              Loading
+            </div>
+          ) : null}
+        </div>
         <p className="mt-1 text-sm text-zinc-500">
           Unsettled days where you still need to pay or receive.
         </p>
@@ -205,20 +222,36 @@ export default function SettlementsPage() {
                           {pair.status === "CAN_REQUEST" ? (
                             <button
                               className="btn btn-primary"
+                              disabled={actionPairId === `${day.date}|${pair.withUserId}|REQUEST`}
                               onClick={() =>
                                 requestSettlement(day.date, pair.withUserId)
                               }
                             >
-                              Request Approval
+                              {actionPairId === `${day.date}|${pair.withUserId}|REQUEST` ? (
+                                <span className="flex items-center gap-2">
+                                  <Spinner size="sm" className="spinner-inverse" />
+                                  Requesting...
+                                </span>
+                              ) : (
+                                "Request Approval"
+                              )}
                             </button>
                           ) : null}
                           {pair.status === "PENDING_APPROVAL" &&
                           pair.settlementId ? (
                             <button
                               className="btn btn-primary"
+                              disabled={actionPairId === pair.settlementId}
                               onClick={() => approveSettlement(pair.settlementId!)}
                             >
-                              Approve
+                              {actionPairId === pair.settlementId ? (
+                                <span className="flex items-center gap-2">
+                                  <Spinner size="sm" className="spinner-inverse" />
+                                  Approving...
+                                </span>
+                              ) : (
+                                "Approve"
+                              )}
                             </button>
                           ) : null}
                         </div>

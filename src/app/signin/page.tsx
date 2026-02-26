@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Spinner from "@/components/Spinner";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -69,7 +70,14 @@ export default function SignInPage() {
             </p>
           ) : null}
           <button className="btn btn-primary w-full" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <Spinner size="sm" className="spinner-inverse" />
+                Signing in...
+              </span>
+            ) : (
+              "Sign in"
+            )}
           </button>
         </form>
         <p className="mt-4 text-sm text-zinc-500">

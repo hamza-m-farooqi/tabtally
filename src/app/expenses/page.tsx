@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
 import { CATEGORIES } from "@/lib/categories";
+import Spinner from "@/components/Spinner";
 
 type User = { id: string; name: string; email: string; role: string };
 
@@ -27,6 +28,7 @@ export default function ExpensesPage() {
   const [messageType, setMessageType] = useState<"error" | "success" | null>(
     null
   );
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -44,6 +46,7 @@ export default function ExpensesPage() {
     event.preventDefault();
     setMessage(null);
     setMessageType(null);
+    setSubmitting(true);
 
     const payload = {
       amount: Number(amount),
@@ -66,12 +69,14 @@ export default function ExpensesPage() {
       setCategory("");
       setMessage("Expense recorded.");
       setMessageType("success");
+      setSubmitting(false);
       return;
     }
 
     const data = await res.json().catch(() => ({}));
     setMessage(data.error || "Failed to record expense.");
     setMessageType("error");
+    setSubmitting(false);
   }
 
   return (
@@ -171,7 +176,16 @@ export default function ExpensesPage() {
                 {message}
               </p>
             ) : null}
-            <button className="btn btn-primary w-full">Save expense</button>
+            <button className="btn btn-primary w-full" disabled={submitting}>
+              {submitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Spinner size="sm" className="spinner-inverse" />
+                  Saving...
+                </span>
+              ) : (
+                "Save expense"
+              )}
+            </button>
           </form>
         </section>
       </div>

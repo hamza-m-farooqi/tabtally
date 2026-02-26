@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import Spinner from "@/components/Spinner";
 
 export default function TopNav({
   userName,
@@ -11,8 +13,10 @@ export default function TopNav({
   isAdmin?: boolean;
 }) {
   const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
+    setSigningOut(true);
     await fetch("/api/auth/signout", { method: "POST" });
     router.push("/signin");
   }
@@ -43,8 +47,19 @@ export default function TopNav({
             Admin
           </Link>
         ) : null}
-        <button className="btn btn-primary" onClick={handleSignOut}>
-          Sign out{userName ? ` (${userName})` : ""}
+        <button
+          className="btn btn-primary"
+          onClick={handleSignOut}
+          disabled={signingOut}
+        >
+          {signingOut ? (
+            <span className="flex items-center gap-2">
+              <Spinner size="sm" className="spinner-inverse" />
+              Signing out...
+            </span>
+          ) : (
+            `Sign out${userName ? ` (${userName})` : ""}`
+          )}
         </button>
       </div>
     </div>

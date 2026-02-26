@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import TopNav from "@/components/TopNav";
 import { CATEGORIES } from "@/lib/categories";
+import Spinner from "@/components/Spinner";
 
 type User = { id: string; name: string; email: string; role: string };
 type Expense = {
@@ -53,6 +54,9 @@ export default function DayDetailPage() {
   const [editParticipants, setEditParticipants] = useState<string[]>([]);
   const [editIncludeMe, setEditIncludeMe] = useState(true);
   const [editMessage, setEditMessage] = useState<string | null>(null);
+  const [loadingDay, setLoadingDay] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -69,6 +73,7 @@ export default function DayDetailPage() {
   const loadDay = useCallback(() => {
     const paramsQuery = new URLSearchParams();
     if (filterCategory) paramsQuery.set("category", filterCategory);
+    setLoadingDay(true);
     fetch(`/api/history/${dateParam}?${paramsQuery}`)
       .then((res) => res.json())
       .then((data) => {
@@ -76,7 +81,8 @@ export default function DayDetailPage() {
         setSummary(data.summary || null);
         setPairwise(data.pairwise || {});
         setApprovedExpenseIds(new Set(data.approvedExpenseIds || []));
-      });
+      })
+      .finally(() => setLoadingDay(false));
   }, [dateParam, filterCategory]);
 
   useEffect(() => {
@@ -108,6 +114,7 @@ export default function DayDetailPage() {
 
   async function saveEdit(expenseId: string) {
     setEditMessage(null);
+    setSavingId(expenseId);
     const payload = {
       amount: Number(editAmount),
       note: editNote || undefined,
@@ -124,17 +131,21 @@ export default function DayDetailPage() {
     if (res.ok) {
       setEditingId(null);
       loadDay();
+      setSavingId(null);
       return;
     }
     const data = await res.json().catch(() => ({}));
     setEditMessage(data.error || "Failed to update expense.");
+    setSavingId(null);
   }
 
   async function deleteExpense(expenseId: string) {
+    setDeletingId(expenseId);
     const res = await fetch(`/api/expenses/${expenseId}`, { method: "DELETE" });
     if (res.ok) {
       loadDay();
     }
+    setDeletingId(null);
   }
 
   const canEdit = (expense: Expense) =>
@@ -148,7 +159,15 @@ export default function DayDetailPage() {
         isAdmin={currentUser?.role === "ADMIN"}
       />
       <section className="card p-6">
-        <h2 className="text-xl font-semibold">Day Detail</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Day Detail</h2>
+          {loadingDay ? (
+            <div className="flex items-center gap-2 text-xs text-zinc-500">
+              <Spinner size="sm" />
+              Loading
+            </div>
+          ) : null}
+        </div>
         <p className="mt-1 text-sm text-zinc-500">{dateParam}</p>
         <div className="mt-4">
           <label className="text-xs uppercase tracking-[0.2em] text-zinc-500">
@@ -201,7 +220,9 @@ export default function DayDetailPage() {
         ) : null}
         <div className="mt-6 space-y-4">
           {expenses.length === 0 ? (
-            <p className="text-sm text-zinc-500">No expenses for this day.</p>
+            <p className="text-sm text-zinc-500">
+              {loadingDay ? "Loading expenses..." : "No expenses for this day."}
+            </p>
           ) : (
             expenses.map((expense) => {
               const participants = expense.participantUserIds.map(
@@ -251,9 +272,17 @@ export default function DayDetailPage() {
                       </button>
                       <button
                         className="btn btn-ghost"
+                        disabled={deletingId === expense._id}
                         onClick={() => deleteExpense(expense._id)}
                       >
-                        Delete
+                        {deletingId === expense._id ? (
+                          <span className="flex items-center gap-2">
+                            <Spinner size="sm" />
+                            Deleting...
+                          </span>
+                        ) : (
+                          "Delete"
+                        )}
                       </button>
                     </div>
                   ) : null}
@@ -375,9 +404,17 @@ export default function DayDetailPage() {
                       <div className="mt-4 flex gap-2">
                         <button
                           className="btn btn-primary"
+                          disabled={savingId === expense._id}
                           onClick={() => saveEdit(expense._id)}
                         >
-                          Save
+                          {savingId === expense._id ? (
+                            <span className="flex items-center gap-2">
+                              <Spinner size="sm" />
+                              Saving...
+                            </span>
+                          ) : (
+                            "Save"
+                          )}
                         </button>
                         <button
                           className="btn btn-ghost"

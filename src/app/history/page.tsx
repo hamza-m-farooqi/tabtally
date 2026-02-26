@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import { CATEGORIES } from "@/lib/categories";
+import Spinner from "@/components/Spinner";
 
 type DayRow = {
   date: string;
@@ -41,6 +42,7 @@ export default function HistoryPage() {
   });
   const [filterCategory, setFilterCategory] = useState("");
   const [monthSummary, setMonthSummary] = useState<MonthSummary | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -52,12 +54,14 @@ export default function HistoryPage() {
     const params = new URLSearchParams();
     if (month) params.set("month", month);
     if (filterCategory) params.set("category", filterCategory);
+    setLoading(true);
     fetch(`/api/history?${params}`)
       .then((res) => res.json())
       .then((data) => {
         setDays(data.days || []);
         setMonthSummary(data.monthSummary || null);
-      });
+      })
+      .finally(() => setLoading(false));
   }, [month, filterCategory]);
 
   return (
@@ -67,7 +71,15 @@ export default function HistoryPage() {
         isAdmin={currentUser?.role === "ADMIN"}
       />
       <section className="card p-6">
-        <h2 className="text-xl font-semibold">History</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">History</h2>
+          {loading ? (
+            <div className="flex items-center gap-2 text-xs text-zinc-500">
+              <Spinner size="sm" />
+              Loading
+            </div>
+          ) : null}
+        </div>
         <p className="mt-1 text-sm text-zinc-500">
           Monthly view with daily totals and your net position.
         </p>
@@ -142,7 +154,7 @@ export default function HistoryPage() {
               {days.length === 0 ? (
                 <tr>
                   <td className="py-4 text-zinc-500" colSpan={3}>
-                    No history yet.
+                    {loading ? "Loading history..." : "No history yet."}
                   </td>
                 </tr>
               ) : (
