@@ -45,7 +45,11 @@ export async function GET(req: NextRequest) {
 
   const dates = Array.from(byDate.keys());
   const settlements = await Settlement.find({
-    ...(dates.length ? { date: { $in: dates } } : {}),
+    ...(month
+      ? { date: { $regex: `^${month}-` } }
+      : dates.length
+      ? { date: { $in: dates } }
+      : {}),
     $or: [
       { paidByUserId: authUser._id },
       { paidToUserId: authUser._id },

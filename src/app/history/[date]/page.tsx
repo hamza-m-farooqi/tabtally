@@ -85,7 +85,6 @@ export default function DayDetailPage() {
   const loadDay = useCallback(() => {
     const q = new URLSearchParams();
     if (filterCategory) q.set("category", filterCategory);
-    setLoadingDay(true);
     fetch(`/api/history/${dateParam}?${q}`)
       .then((r) => r.json())
       .then((d) => {
@@ -132,7 +131,13 @@ export default function DayDetailPage() {
         includeMe: editIncludeMe,
       }),
     });
-    if (res.ok) { setEditingId(null); loadDay(); setSavingId(null); return; }
+    if (res.ok) {
+      setEditingId(null);
+      setLoadingDay(true);
+      loadDay();
+      setSavingId(null);
+      return;
+    }
     const d = await res.json().catch(() => ({}));
     setEditMessage(d.error || "Failed to update expense.");
     setSavingId(null);
@@ -141,7 +146,10 @@ export default function DayDetailPage() {
   async function deleteExpense(expenseId: string) {
     setDeletingId(expenseId);
     const res = await fetch(`/api/expenses/${expenseId}`, { method: "DELETE" });
-    if (res.ok) loadDay();
+    if (res.ok) {
+      setLoadingDay(true);
+      loadDay();
+    }
     setDeletingId(null);
   }
 
@@ -190,7 +198,10 @@ export default function DayDetailPage() {
             <select
               className="input"
               value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
+              onChange={(e) => {
+                setLoadingDay(true);
+                setFilterCategory(e.target.value);
+              }}
             >
               <option value="">All categories</option>
               {CATEGORIES.map((item) => (

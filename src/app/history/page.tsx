@@ -96,7 +96,6 @@ export default function HistoryPage() {
     const params = new URLSearchParams();
     if (month) params.set("month", month);
     if (filterCategory) params.set("category", filterCategory);
-    setLoading(true);
     fetch(`/api/history?${params}`)
       .then((res) => res.json())
       .then((data) => {
@@ -122,7 +121,10 @@ export default function HistoryPage() {
             className="input"
             type="month"
             value={month}
-            onChange={(e) => setMonth(e.target.value)}
+            onChange={(e) => {
+              setLoading(true);
+              setMonth(e.target.value);
+            }}
           />
         </div>
         <div className="history-filter-group">
@@ -130,7 +132,10 @@ export default function HistoryPage() {
           <select
             className="input"
             value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
+            onChange={(e) => {
+              setLoading(true);
+              setFilterCategory(e.target.value);
+            }}
           >
             <option value="">All categories</option>
             {CATEGORIES.map((item) => (

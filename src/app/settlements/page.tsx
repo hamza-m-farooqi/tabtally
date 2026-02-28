@@ -79,7 +79,6 @@ export default function SettlementsPage() {
     const params = new URLSearchParams();
     if (month) params.set("month", month);
     if (filterCategory) params.set("category", filterCategory);
-    setLoadingDays(true);
     return fetch(`/api/settlements/unsettled?${params}`)
       .then((r) => r.json())
       .then((d) => setDays(d.days || []))
@@ -90,6 +89,7 @@ export default function SettlementsPage() {
 
   async function requestSettlement(date: string, withUserId: string) {
     setActionPairId(`${date}|${withUserId}|REQUEST`);
+    setLoadingDays(true);
     await fetch("/api/settlements/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -101,6 +101,7 @@ export default function SettlementsPage() {
 
   async function approveSettlement(settlementId: string) {
     setActionPairId(settlementId);
+    setLoadingDays(true);
     await fetch("/api/settlements/approve", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -127,7 +128,10 @@ export default function SettlementsPage() {
             className="input"
             type="month"
             value={month}
-            onChange={(e) => setMonth(e.target.value)}
+            onChange={(e) => {
+              setLoadingDays(true);
+              setMonth(e.target.value);
+            }}
           />
         </div>
         <div className="history-filter-group">
@@ -135,7 +139,10 @@ export default function SettlementsPage() {
           <select
             className="input"
             value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
+            onChange={(e) => {
+              setLoadingDays(true);
+              setFilterCategory(e.target.value);
+            }}
           >
             <option value="">All categories</option>
             {CATEGORIES.map((item) => (

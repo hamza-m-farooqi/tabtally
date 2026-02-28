@@ -42,16 +42,21 @@ export function buildPairwiseNet(
     let balance = 0;
     for (const e of expenses) {
       const participants = e.participantUserIds.map((id) => id.toString());
-      if (!participants.includes(currentUserId)) continue;
-      if (!participants.includes(otherId)) continue;
+      const payer = e.paidByUserId.toString();
+      const otherIsParticipant = participants.includes(otherId);
+      const otherIsPayer = payer === otherId;
+      if (!otherIsParticipant && !otherIsPayer) continue;
 
       const share = e.amount / Math.max(participants.length, 1);
-      const payer = e.paidByUserId.toString();
 
       if (payer === currentUserId) {
+        // You paid for other participants, even if you are not a participant.
         balance += share;
       } else if (payer === otherId) {
-        balance -= share;
+        // Only owe the other user if you were part of the split.
+        if (participants.includes(currentUserId)) {
+          balance -= share;
+        }
       }
     }
     result[otherId] = roundCurrency(balance);

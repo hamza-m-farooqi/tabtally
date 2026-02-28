@@ -43,16 +43,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const otherUserObjectId = toObjectId(withUserId);
   const expenses = await Expense.find({
     date,
-    participantUserIds: { $all: [authUser._id, toObjectId(withUserId)] },
+    $or: [
+      { participantUserIds: { $all: [authUser._id, otherUserObjectId] } },
+      {
+        paidByUserId: { $in: [authUser._id, otherUserObjectId] },
+        participantUserIds: otherUserObjectId,
+      },
+      {
+        paidByUserId: { $in: [authUser._id, otherUserObjectId] },
+        participantUserIds: authUser._id,
+      },
+    ],
   }).lean();
 
   const settlements = await Settlement.find({
     date,
     $or: [
-      { paidByUserId: authUser._id, paidToUserId: toObjectId(withUserId) },
-      { paidByUserId: toObjectId(withUserId), paidToUserId: authUser._id },
+      { paidByUserId: authUser._id, paidToUserId: otherUserObjectId },
+      { paidByUserId: otherUserObjectId, paidToUserId: authUser._id },
     ],
     status: { $in: ["REQUESTED", "APPROVED"] },
   }).lean();

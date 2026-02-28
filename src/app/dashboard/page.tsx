@@ -61,7 +61,7 @@ export default function DashboardPage() {
   const [monthSummary, setMonthSummary] = useState<MonthSummary | null>(null);
   const [days, setDays] = useState<DayRow[]>([]);
   const [unsettledDays, setUnsettledDays] = useState<SettlementDay[]>([]);
-  const [month] = useState(currentMonthISO());
+  const [month, setMonth] = useState(currentMonthISO());
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [loadingUnsettled, setLoadingUnsettled] = useState(true);
 
@@ -74,7 +74,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const params = new URLSearchParams();
     params.set("month", month);
-    setLoadingSummary(true);
     fetch(`/api/history?${params}`)
       .then((res) => res.json())
       .then((data) => {
@@ -87,7 +86,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const params = new URLSearchParams();
     params.set("month", month);
-    setLoadingUnsettled(true);
     fetch(`/api/settlements/unsettled?${params}`)
       .then((res) => res.json())
       .then((data) => setUnsettledDays(data.days || []))
@@ -148,6 +146,27 @@ export default function DashboardPage() {
       isAdmin={currentUser?.role === "ADMIN"}
     >
       <div className="grid gap-6">
+        <div className="history-filters card">
+          <div className="history-filter-group">
+            <label className="history-filter-label">Month</label>
+            <input
+              className="input"
+              type="month"
+              value={month}
+              onChange={(e) => {
+                setLoadingSummary(true);
+                setLoadingUnsettled(true);
+                setMonth(e.target.value);
+              }}
+            />
+          </div>
+          {(loadingSummary || loadingUnsettled) && (
+            <div className="history-filter-loading">
+              <Spinner size="sm" />
+              <span>Refreshing…</span>
+            </div>
+          )}
+        </div>
         <section className="card p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>

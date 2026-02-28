@@ -80,7 +80,8 @@ export default function Sidebar({
 
     // Close mobile drawer on route change
     useEffect(() => {
-        setMobileOpen(false);
+        const id = window.setTimeout(() => setMobileOpen(false), 0);
+        return () => window.clearTimeout(id);
     }, [pathname]);
 
     // Prevent body scroll when mobile drawer is open
