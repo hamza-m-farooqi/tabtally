@@ -18,6 +18,6 @@ export const expenseSchema = z.object({
   note: z.string().optional(),
   category: z.string().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  participantUserIds: z.array(z.string()).min(1),
+  participantUserIds: z.array(z.string()).min(0),
   includeMe: z.boolean().default(true),
 });
